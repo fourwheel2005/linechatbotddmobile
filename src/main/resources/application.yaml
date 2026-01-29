@@ -18,6 +18,9 @@ line:
     handler:
       path: /callback
 
+  admin:
+    user-id: "U8bdb3d7093b1841ccb9faed82142201b"
+
 openai:
   api:
     key: "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"
