@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/linechatbotddmobile
-    username: root
-    password: root
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/linechatbotddmobile}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
   jpa:
     show-sql: true
     hibernate:
@@ -13,16 +13,16 @@ spring:
 
 line:
   bot:
-    channel-token: "3nGjgz5lSz2VPG9j8isnsHsqm8vMhwpT0T2oKx60smilfBhk0+LbNg8fiY+6SZ9RYPPfYe6gbB4Qy1vkTTMZXfZtq0agFRWgdetMMYrMKgKzFe8+GdvFGFZDB8awLXMK+V7+27b4uDIY1iBUrGboMQdB04t89/1O/w1cDnyilFU="
-    channel-secret: "2b37b51d4b33e052b75d1caf917ce0eb"
+    channel-token: ${LINE_BOT_CHANNEL_TOKEN}
+    channel-secret: ${LINE_BOT_CHANNEL_SECRET}
     handler:
       path: /callback
 
   admin:
-    user-id: "U8bdb3d7093b1841ccb9faed82142201b"
+    user-id: ${LINE_ADMIN_USER_ID}
 
 openai:
   api:
-    key: "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"
+    key: ${OPENAI_API_KEY}
     url: "https://api.openai.com/v1"
   model: "gpt-4o-mini"

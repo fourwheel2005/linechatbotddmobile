@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: linechatbot-app
+    ports:
+      - "8080:8080"
+    environment:
+      # --- Database Configuration ---
+      # ใช้ตัวแปรจาก .env
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+
+      # --- JPA Settings ---
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+
+      # --- API Keys & Secrets (ดึงค่าจาก .env) ---
+      - LINE_BOT_CHANNEL_TOKEN=${LINE_BOT_CHANNEL_TOKEN}
+      - LINE_BOT_CHANNEL_SECRET=${LINE_BOT_CHANNEL_SECRET}
+      - LINE_ADMIN_USER_ID=${LINE_ADMIN_USER_ID}
+
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_URL=https://api.openai.com/v1
+      - OPENAI_MODEL=gpt-4o-mini
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: linechatbot-db
+    environment:
+      # Database setup ใช้ตัวแปรเดียวกันเพื่อให้ตรงกันเสมอ
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
