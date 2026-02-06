@@ -1,21 +1,26 @@
 package com.example.linechatbotddmobile.Line;
 
+import com.example.linechatbotddmobile.bot.BotUser;
+import com.example.linechatbotddmobile.bot.BotUserRepository;
 import com.example.linechatbotddmobile.chatgpt.OpenAiService;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linecorp.bot.client.base.Result;
 import com.linecorp.bot.messaging.client.MessagingApiClient;
-import com.linecorp.bot.messaging.model.PushMessageRequest;
-import com.linecorp.bot.messaging.model.ReplyMessageRequest;
-import com.linecorp.bot.messaging.model.TextMessage;
+import com.linecorp.bot.messaging.model.*;
 import com.linecorp.bot.spring.boot.handler.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.handler.annotation.LineMessageHandler;
 import com.linecorp.bot.webhook.model.ImageMessageContent;
 import com.linecorp.bot.webhook.model.MessageEvent;
+
 import com.linecorp.bot.webhook.model.TextMessageContent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.net.URI;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @LineMessageHandler
@@ -23,24 +28,22 @@ public class LineBotHandler {
 
     private final OpenAiService openAiService;
     private final MessagingApiClient messagingApiClient;
+    private final BotUserRepository botUserRepository; // ✅ เรียกใช้ Database
+    private final ObjectMapper objectMapper = new ObjectMapper(); // ✅ ตัวช่วยแปลง JSON
 
-    // เก็บสถานะว่าลูกค้าคนไหนคุยกับคนอยู่ (True = คน, False = AI)
-    private final Map<String, Boolean> humanModeMap = new ConcurrentHashMap<>();
-
-    // 🧠 MEMORY: เก็บประวัติการคุย แยกตาม User ID
-    private final Map<String, List<Map<String, String>>> userHistoryMap = new ConcurrentHashMap<>();
-
-    // รับค่า ID ของแอดมินจาก application.yml
     @Value("${line.admin.user-id:}")
     private String adminUserId;
 
-    // 🟢 ใส่ ID ร้านของคุณตรงนี้ (อย่าลืม @ ข้างหน้า)
-    private static final String SHOP_BASIC_ID = "@837dszgr";
+    // ใส่ ID ร้านค้าของคุณที่ถูกต้อง
+    private static final String SHOP_CHAT_ID = "U23e97d0170118f9b6c5a951625850a7e";
 
     @Autowired
-    public LineBotHandler(OpenAiService openAiService, MessagingApiClient messagingApiClient) {
+    public LineBotHandler(OpenAiService openAiService,
+                          MessagingApiClient messagingApiClient,
+                          BotUserRepository botUserRepository) {
         this.openAiService = openAiService;
         this.messagingApiClient = messagingApiClient;
+        this.botUserRepository = botUserRepository;
     }
 
     @EventMapping
@@ -49,74 +52,65 @@ public class LineBotHandler {
             String userId = event.source().userId();
             String replyToken = event.replyToken();
 
+            // 1️⃣ ดึงข้อมูล User จาก Database (ถ้าไม่มีให้สร้างใหม่)
+            BotUser botUser = botUserRepository.findById(userId)
+                    .orElse(new BotUser(userId, false, "[]"));
+
+            // แปลง History จาก JSON String ใน DB ออกมาเป็น List
+            List<Map<String, String>> currentHistory = parseHistory(botUser.getChatHistoryJson());
+
             // --------------------------------------------------
-            // กรณี 1: ลูกค้าส่งข้อความตัวอักษร (Text)
+            // กรณี: ข้อความ Text
             // --------------------------------------------------
             if (event.message() instanceof TextMessageContent textContent) {
                 String userText = textContent.text().trim();
 
-                // 🛠️ เช็ค User ID ของตัวเอง
-                if ("#admin_id".equalsIgnoreCase(userText)) {
-                    reply(replyToken, "🔑 User ID ของคุณคือ:\n" + userId);
-                    return;
-                }
-
-                // 🛠️ สั่งรีเซ็ตบอท + ล้างความจำ
+                // 🛠️ Reset Bot
                 if ("bot_start".equalsIgnoreCase(userText) || "#reset".equalsIgnoreCase(userText)) {
-                    humanModeMap.put(userId, false);
-                    userHistoryMap.remove(userId); // ล้างความจำ
-                    reply(replyToken, "🤖 น้องดีดี (AI) กลับมาประจำการแล้วครับ! (ล้างความจำเรียบร้อย)");
+                    botUser.setHumanMode(false);
+                    botUser.setChatHistoryJson("[]"); // ล้างประวัติ
+                    botUserRepository.save(botUser); // ✅ บันทึกลง DB
+                    reply(replyToken, "🤖 น้องดีดี (AI) กลับมาประจำการแล้วครับ! (Reset Complete)");
                     return;
                 }
 
-                // 🛑 เช็คโหมดคน
-                if (humanModeMap.getOrDefault(userId, false)) {
+                // 🛑 เช็คโหมดคน (ดึงค่าจาก DB)
+                if (botUser.isHumanMode()) {
                     return; // ให้แอดมินตอบเอง
                 }
 
-                // --- เริ่มกระบวนการ AI Memory ---
-
-                // 1. ดึงประวัติเก่า (ถ้าไม่มีให้สร้างใหม่)
-                List<Map<String, String>> currentHistory = userHistoryMap.getOrDefault(userId, new ArrayList<>());
-
-                // 2. เพิ่มข้อความ "ลูกค้า" เข้าไป
+                // --- AI Process ---
                 currentHistory.add(Map.of("role", "user", "content", userText));
 
-                // 3. จำกัดความจำ (Sliding Window) เก็บไว้แค่ 10 ข้อความล่าสุด
+                // ตัด History ให้เหลือ 10 ข้อความล่าสุด (กัน Token เต็ม)
                 if (currentHistory.size() > 10) {
-                    // ลบข้อความเก่าสุดออก (Index 0)
-                    currentHistory.subList(0, currentHistory.size() - 10).clear();
+                    currentHistory = currentHistory.subList(currentHistory.size() - 10, currentHistory.size());
                 }
 
-                System.out.println(">>> User (" + userId + "): " + userText);
-
-                // 4. ส่งประวัติทั้งหมดไปหา OpenAI
                 String aiResponse = openAiService.getChatGptResponse(currentHistory);
 
-                System.out.println(">>> AI: " + aiResponse);
-
-                // 🚨 เช็คว่าต้องเรียกแอดมินไหม
+                // 🚨 เช็ค Trigger เรียกแอดมิน
                 if (aiResponse.contains("[CALL_ADMIN]")) {
-                    activateHumanMode(userId, "ลูกค้าสอบถามเรื่องซับซ้อน: " + userText);
+                    activateHumanMode(botUser, "ลูกค้าสอบถามเรื่องซับซ้อน: " + userText);
                     reply(replyToken, "สักครู่นะครับ แอดมินขอตรวจสอบข้อมูลสักครู่ครับผม (เดี๋ยวแอดมินตัวจริงมาตอบครับ 🏃‍♂️)");
                     return;
                 }
 
-                // 5. เพิ่มข้อความ "AI" เข้าไปในประวัติ
+                // บันทึกคำตอบ AI ลง History
                 currentHistory.add(Map.of("role", "assistant", "content", aiResponse));
 
-                // 6. บันทึกประวัติกลับลง Map
-                userHistoryMap.put(userId, currentHistory);
+                // ✅ บันทึกข้อมูลล่าสุดลง Database
+                botUser.setChatHistoryJson(objectMapper.writeValueAsString(currentHistory));
+                botUserRepository.save(botUser);
 
-                // ✅ ตอบกลับลูกค้า
                 reply(replyToken, aiResponse);
             }
 
             // --------------------------------------------------
-            // กรณี 2: ลูกค้าส่งรูปภาพ (Image)
+            // กรณี: รูปภาพ
             // --------------------------------------------------
             else if (event.message() instanceof ImageMessageContent) {
-                activateHumanMode(userId, "📸 ลูกค้าส่งรูปภาพเข้ามาครับ");
+                activateHumanMode(botUser, "📸 ลูกค้าส่งรูปภาพเข้ามาครับ");
                 reply(replyToken, "ได้รับรูปภาพแล้วครับผม! 👍 รบกวนรอแอดมินตรวจสอบสภาพเครื่องสักครู่นะครับ");
             }
 
@@ -126,6 +120,61 @@ public class LineBotHandler {
     }
 
     // --- Helper Functions ---
+
+    private void activateHumanMode(BotUser botUser, String reason) {
+        // 1. บันทึกลง Database ว่าลูกค้าคนนี้ขอคุยกับคน
+        botUser.setHumanMode(true);
+        botUserRepository.save(botUser);
+
+        // 2. เช็คว่ามี Admin ID หรือไม่ ถ้ามีให้ส่งแจ้งเตือน
+        if (adminUserId != null && !adminUserId.isEmpty()) {
+            try {
+                // --- ส่วนที่แก้ Error ---
+                // ใช้ 'var' เพื่อให้ Java จับคู่ Type ให้อัตโนมัติ (แก้ปัญหา Type Mismatch)
+                var profile = messagingApiClient.getProfile(botUser.getUserId()).get();
+
+                List<Message> messages = getMessages(botUser, reason, profile);
+
+                messagingApiClient.pushMessage(
+                        UUID.randomUUID(),
+                        new PushMessageRequest(
+                                adminUserId,
+                                messages,
+                                false,
+                                null
+                        )
+                ).get();
+
+            } catch (Exception e) {
+                log.error("Failed to notify admin", e);
+            }
+        }
+    }
+
+    private static List<Message> getMessages(BotUser botUser, String reason, Result<UserProfileResponse> profile) {
+        String displayName = profile.body().displayName();
+        URI pictureUrl = profile.body().pictureUrl();
+
+        // เตรียมข้อความที่จะส่งหาแอดมิน
+        List<Message> messages = new ArrayList<>();
+
+        // ข้อความแจ้งเตือน
+        String alertMsg = "🚨 ลูกค้าต้องการคุยกับคน!\n" +
+                "👤 ชื่อ: " + displayName + "\n" +
+                "📝 สาเหตุ: " + reason + "\n" +
+                "👇 (ค้นหาชื่อนี้ในแชทได้เลยครับ)";
+        messages.add(new TextMessage(alertMsg));
+
+        // ข้อความรูปภาพ (เช็คก่อนว่าลูกค้ามีรูปไหม เพื่อป้องกัน Error)
+        if (pictureUrl != null) {
+            messages.add(new ImageMessage(pictureUrl, pictureUrl));
+        }
+
+        // ข้อความ UserID (เผื่อต้องใช้ค้นหา)
+        messages.add(new TextMessage("🆔 UserID: " + botUser.getUserId()));
+        return messages;
+    }
+
     private void reply(String replyToken, String message) {
         try {
             messagingApiClient.replyMessage(
@@ -136,22 +185,13 @@ public class LineBotHandler {
         }
     }
 
-    private void activateHumanMode(String customerId, String reason) {
-        humanModeMap.put(customerId, true);
-
-        // แจ้งเตือนแอดมิน (ถ้าตั้งค่า adminUserId ไว้)
-        if (adminUserId != null && !adminUserId.isEmpty()) {
-            try {
-                String chatUrl = "https://manager.line.biz/account/" + SHOP_BASIC_ID + "/chat/" + customerId;
-                String alertMsg = "🚨 บอทเรียกแอดมินด่วน!\nCause: " + reason + "\n👉 " + chatUrl;
-
-                messagingApiClient.pushMessage(
-                        UUID.randomUUID(),
-                        new PushMessageRequest(adminUserId, List.of(new TextMessage(alertMsg)), false, null)
-                ).get();
-            } catch (Exception e) {
-                log.error("Push notification failed", e);
-            }
+    // แปลง JSON String -> List<Map>
+    private List<Map<String, String>> parseHistory(String json) {
+        try {
+            if (json == null || json.isEmpty()) return new ArrayList<>();
+            return objectMapper.readValue(json, new TypeReference<List<Map<String, String>>>() {});
+        } catch (Exception e) {
+            return new ArrayList<>();
         }
     }
 }
