@@ -16,10 +16,10 @@ import lombok.NoArgsConstructor;
 public class BotUser {
 
     @Id
-    private String userId; // ใช้ UserID ของไลน์เป็น Primary Key
+    private String userId;
 
     @Column(name = "is_human_mode")
-    private boolean humanMode; // true = คุยกับคน, false = คุยกับ AI
+    private boolean humanMode;
 
 
     @Column(columnDefinition = "TEXT")
