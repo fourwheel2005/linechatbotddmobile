@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "bot_users")
 @Data
@@ -24,4 +26,7 @@ public class BotUser {
 
     @Column(columnDefinition = "TEXT")
     private String chatHistoryJson;
+
+    @Column(name = "last_active_time")
+    private LocalDateTime lastActiveTime;
 }

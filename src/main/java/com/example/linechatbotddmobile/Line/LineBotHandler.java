@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.net.URI;
+import java.time.LocalDateTime; // ✅ Import เวลา
 import java.util.*;
 
 @Slf4j
@@ -28,14 +29,11 @@ public class LineBotHandler {
 
     private final OpenAiService openAiService;
     private final MessagingApiClient messagingApiClient;
-    private final BotUserRepository botUserRepository; // ✅ เรียกใช้ Database
-    private final ObjectMapper objectMapper = new ObjectMapper(); // ✅ ตัวช่วยแปลง JSON
+    private final BotUserRepository botUserRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${line.admin.user-id:}")
     private String adminUserId;
-
-    // ใส่ ID ร้านค้าของคุณที่ถูกต้อง
-    private static final String SHOP_CHAT_ID = "U23e97d0170118f9b6c5a951625850a7e";
 
     @Autowired
     public LineBotHandler(OpenAiService openAiService,
@@ -52,11 +50,14 @@ public class LineBotHandler {
             String userId = event.source().userId();
             String replyToken = event.replyToken();
 
-            // 1️⃣ ดึงข้อมูล User จาก Database (ถ้าไม่มีให้สร้างใหม่)
+            // 1️⃣ ดึงข้อมูล User (ถ้าไม่มีให้สร้างใหม่ พร้อมเวลาเริ่มต้น)
             BotUser botUser = botUserRepository.findById(userId)
-                    .orElse(new BotUser(userId, false, "[]"));
+                    .orElse(new BotUser(userId, false, "[]", LocalDateTime.now()));
 
-            // แปลง History จาก JSON String ใน DB ออกมาเป็น List
+            // ✅ อัปเดตเวลาล่าสุดเสมอ (เพื่อให้ Scheduler รู้ว่ายังคุยอยู่)
+            botUser.setLastActiveTime(LocalDateTime.now());
+            botUserRepository.save(botUser);
+
             List<Map<String, String>> currentHistory = parseHistory(botUser.getChatHistoryJson());
 
             // --------------------------------------------------
@@ -65,24 +66,23 @@ public class LineBotHandler {
             if (event.message() instanceof TextMessageContent textContent) {
                 String userText = textContent.text().trim();
 
-                // 🛠️ Reset Bot
+                // 🛠️ Reset Bot (Manual)
                 if ("bot_start".equalsIgnoreCase(userText) || "#reset".equalsIgnoreCase(userText)) {
                     botUser.setHumanMode(false);
-                    botUser.setChatHistoryJson("[]"); // ล้างประวัติ
-                    botUserRepository.save(botUser); // ✅ บันทึกลง DB
+                    botUser.setChatHistoryJson("[]");
+                    botUserRepository.save(botUser);
                     reply(replyToken, "🤖 น้องดีดี (AI) กลับมาประจำการแล้วครับ! (Reset Complete)");
                     return;
                 }
 
-                // 🛑 เช็คโหมดคน (ดึงค่าจาก DB)
+                // 🛑 เช็คโหมดคน
                 if (botUser.isHumanMode()) {
-                    return; // ให้แอดมินตอบเอง
+                    return; // แอดมินคุยอยู่ บอทไม่ยุ่ง
                 }
 
                 // --- AI Process ---
                 currentHistory.add(Map.of("role", "user", "content", userText));
 
-                // ตัด History ให้เหลือ 10 ข้อความล่าสุด (กัน Token เต็ม)
                 if (currentHistory.size() > 10) {
                     currentHistory = currentHistory.subList(currentHistory.size() - 10, currentHistory.size());
                 }
@@ -96,10 +96,7 @@ public class LineBotHandler {
                     return;
                 }
 
-                // บันทึกคำตอบ AI ลง History
                 currentHistory.add(Map.of("role", "assistant", "content", aiResponse));
-
-                // ✅ บันทึกข้อมูลล่าสุดลง Database
                 botUser.setChatHistoryJson(objectMapper.writeValueAsString(currentHistory));
                 botUserRepository.save(botUser);
 
@@ -119,30 +116,20 @@ public class LineBotHandler {
         }
     }
 
-    // --- Helper Functions ---
 
     private void activateHumanMode(BotUser botUser, String reason) {
-        // 1. บันทึกลง Database ว่าลูกค้าคนนี้ขอคุยกับคน
         botUser.setHumanMode(true);
+        botUser.setLastActiveTime(LocalDateTime.now()); // ✅ อัปเดตเวลาตอนเริ่มโหมดคนด้วย
         botUserRepository.save(botUser);
 
-        // 2. เช็คว่ามี Admin ID หรือไม่ ถ้ามีให้ส่งแจ้งเตือน
         if (adminUserId != null && !adminUserId.isEmpty()) {
             try {
-                // --- ส่วนที่แก้ Error ---
-                // ใช้ 'var' เพื่อให้ Java จับคู่ Type ให้อัตโนมัติ (แก้ปัญหา Type Mismatch)
                 var profile = messagingApiClient.getProfile(botUser.getUserId()).get();
-
                 List<Message> messages = getMessages(botUser, reason, profile);
 
                 messagingApiClient.pushMessage(
                         UUID.randomUUID(),
-                        new PushMessageRequest(
-                                adminUserId,
-                                messages,
-                                false,
-                                null
-                        )
+                        new PushMessageRequest(adminUserId, messages, false, null)
                 ).get();
 
             } catch (Exception e) {
@@ -155,22 +142,16 @@ public class LineBotHandler {
         String displayName = profile.body().displayName();
         URI pictureUrl = profile.body().pictureUrl();
 
-        // เตรียมข้อความที่จะส่งหาแอดมิน
         List<Message> messages = new ArrayList<>();
-
-        // ข้อความแจ้งเตือน
         String alertMsg = "🚨 ลูกค้าต้องการคุยกับคน!\n" +
                 "👤 ชื่อ: " + displayName + "\n" +
                 "📝 สาเหตุ: " + reason + "\n" +
                 "👇 (ค้นหาชื่อนี้ในแชทได้เลยครับ)";
         messages.add(new TextMessage(alertMsg));
 
-        // ข้อความรูปภาพ (เช็คก่อนว่าลูกค้ามีรูปไหม เพื่อป้องกัน Error)
         if (pictureUrl != null) {
             messages.add(new ImageMessage(pictureUrl, pictureUrl));
         }
-
-        // ข้อความ UserID (เผื่อต้องใช้ค้นหา)
         messages.add(new TextMessage("🆔 UserID: " + botUser.getUserId()));
         return messages;
     }
@@ -185,7 +166,6 @@ public class LineBotHandler {
         }
     }
 
-    // แปลง JSON String -> List<Map>
     private List<Map<String, String>> parseHistory(String json) {
         try {
             if (json == null || json.isEmpty()) return new ArrayList<>();
