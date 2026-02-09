@@ -17,8 +17,8 @@ public class BotScheduler {
     @Autowired
     private BotUserRepository botUserRepository;
 
-    // เช็คทุกๆ 4 นาที (240000 ms)
-    @Scheduled(fixedRate = 240000)
+    // เช็คทุกๆ 1 นาที (60000 ms)
+    @Scheduled(fixedRate = 60000)
     public void autoResetHumanMode() {
         // ตั้งเวลาหมดอายุ เช่น 30 นาที
         LocalDateTime timeoutThreshold = LocalDateTime.now().minusMinutes(30);

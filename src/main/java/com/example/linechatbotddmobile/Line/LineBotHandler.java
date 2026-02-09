@@ -11,16 +11,17 @@ import com.linecorp.bot.messaging.client.MessagingApiClient;
 import com.linecorp.bot.messaging.model.*;
 import com.linecorp.bot.spring.boot.handler.annotation.EventMapping;
 import com.linecorp.bot.spring.boot.handler.annotation.LineMessageHandler;
+import com.linecorp.bot.webhook.model.FollowEvent;
 import com.linecorp.bot.webhook.model.ImageMessageContent;
 import com.linecorp.bot.webhook.model.MessageEvent;
-
 import com.linecorp.bot.webhook.model.TextMessageContent;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.net.URI;
-import java.time.LocalDateTime; // ✅ Import เวลา
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -32,8 +33,9 @@ public class LineBotHandler {
     private final BotUserRepository botUserRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${line.admin.user-id:}")
-    private String adminUserId;
+    // 🟢 แก้ไขจุดที่ 1: เปลี่ยนจาก String เป็น List<String> เพื่อรับหลาย ID
+    @Value("${line.admin.user-ids:}")
+    private List<String> adminUserIds;
 
     @Autowired
     public LineBotHandler(OpenAiService openAiService,
@@ -44,17 +46,66 @@ public class LineBotHandler {
         this.botUserRepository = botUserRepository;
     }
 
+    // =========================================================================
+    // 🟢 Event 1: ลูกค้าใหม่กด "เพิ่มเพื่อน" (Add Friend)
+    // =========================================================================
+    @EventMapping
+    public void handleFollow(FollowEvent event) {
+        String userId = event.source().userId();
+
+        // ลูกค้าใหม่ 100% -> สร้าง User และ "เปิดบอททันที" (HumanMode = false)
+        BotUser newUser = new BotUser(userId, false, "[]", LocalDateTime.now());
+        botUserRepository.save(newUser);
+
+        reply(event.replyToken(), "สวัสดีครับ! 👋 น้องดีดี ยินดีให้บริการครับ");
+
+        log.info("New friend added: {}", userId);
+    }
+
+    // =========================================================================
+    // 🔵 Event 2: มีข้อความเข้า (ทั้งลูกค้าเก่าและใหม่)
+    // =========================================================================
     @EventMapping
     public void handleEvent(MessageEvent event) {
         try {
             String userId = event.source().userId();
             String replyToken = event.replyToken();
 
-            // 1️⃣ ดึงข้อมูล User (ถ้าไม่มีให้สร้างใหม่ พร้อมเวลาเริ่มต้น)
-            BotUser botUser = botUserRepository.findById(userId)
-                    .orElse(new BotUser(userId, false, "[]", LocalDateTime.now()));
+            // ------------------------------------------------------------------
+            // 👑 Admin Remote Control: แอดมินสั่งรีเซ็ตลูกค้าผ่านแชทส่วนตัว
+            // ------------------------------------------------------------------
+            // 🟢 แก้ไขจุดที่ 2: เช็คว่าคนส่ง เป็นหนึ่งใน Admin หรือไม่
+            if (event.message() instanceof TextMessageContent adminText && adminUserIds.contains(userId)) {
+                String command = adminText.text().trim();
+                // คำสั่ง: reset U1234...
+                if (command.startsWith("reset ")) {
+                    String targetId = command.split(" ")[1];
+                    Optional<BotUser> targetOpt = botUserRepository.findById(targetId);
+                    if (targetOpt.isPresent()) {
+                        BotUser t = targetOpt.get();
+                        t.setHumanMode(false);
+                        t.setChatHistoryJson("[]");
+                        botUserRepository.save(t);
+                        reply(replyToken, "✅ Reset ลูกค้า " + targetId + " เรียบร้อยครับ");
+                    } else {
+                        reply(replyToken, "❌ ไม่พบ UserID นี้ในระบบ");
+                    }
+                    return;
+                }
+            }
 
-            // ✅ อัปเดตเวลาล่าสุดเสมอ (เพื่อให้ Scheduler รู้ว่ายังคุยอยู่)
+            // ------------------------------------------------------------------
+            // 🛡️ User Safety Logic: จัดการลูกค้าเก่า vs ใหม่
+            // ------------------------------------------------------------------
+            BotUser botUser = botUserRepository.findById(userId)
+                    .orElseGet(() -> {
+                        // 🚨 ถ้าไม่เจอใน DB แสดงว่าเป็น "ลูกค้าเก่า" -> ให้เป็น HumanMode = true (เงียบไว้ก่อน)
+                        BotUser oldUser = new BotUser(userId, true, "[]", LocalDateTime.now());
+                        botUserRepository.save(oldUser);
+                        return oldUser;
+                    });
+
+            // อัปเดตเวลาล่าสุดเสมอ
             botUser.setLastActiveTime(LocalDateTime.now());
             botUserRepository.save(botUser);
 
@@ -66,7 +117,7 @@ public class LineBotHandler {
             if (event.message() instanceof TextMessageContent textContent) {
                 String userText = textContent.text().trim();
 
-                // 🛠️ Reset Bot (Manual)
+                // 🛠️ Reset Bot (ลูกค้าพิมพ์เอง)
                 if ("bot_start".equalsIgnoreCase(userText) || "#reset".equalsIgnoreCase(userText)) {
                     botUser.setHumanMode(false);
                     botUser.setChatHistoryJson("[]");
@@ -75,9 +126,26 @@ public class LineBotHandler {
                     return;
                 }
 
-                // 🛑 เช็คโหมดคน
+                // 🛑 เช็คโหมดคน (Human Mode)
                 if (botUser.isHumanMode()) {
-                    return; // แอดมินคุยอยู่ บอทไม่ยุ่ง
+
+                    // ⭐ Wake Word System (ระบบปลุกบอทสำหรับลูกค้าเก่า) =====================
+                    List<String> wakeWords = Arrays.asList(
+                            "สนใจ", "ราคา", "ผ่อน", "โปร",
+                            "ดาวน์", "เท่าไหร่", "กี่บาท", "ซื้อ",
+                            "iPhone", "iphone", "ไอโฟน", "12", "13", "14", "15", "16",
+                            "ตาราง", "เอกสาร", "คนละครึ่ง", "สอบถาม"
+                    );
+
+                    boolean isWakeWord = wakeWords.stream().anyMatch(userText::contains);
+
+                    if (isWakeWord) {
+                        log.info("Wake word detected! Switching user {} to AI mode.", userId);
+                        botUser.setHumanMode(false); // ปลดล็อค
+                        botUserRepository.save(botUser);
+                    } else {
+                        return; // ⛔ ถ้าพิมพ์เรื่องอื่น ให้เงียบ
+                    }
                 }
 
                 // --- AI Process ---
@@ -104,7 +172,7 @@ public class LineBotHandler {
             }
 
             // --------------------------------------------------
-            // กรณี: รูปภาพ
+            // กรณี: รูปภาพ (ลูกค้าส่งรูปมา -> เรียกแอดมินเสมอ)
             // --------------------------------------------------
             else if (event.message() instanceof ImageMessageContent) {
                 activateHumanMode(botUser, "📸 ลูกค้าส่งรูปภาพเข้ามาครับ");
@@ -116,24 +184,40 @@ public class LineBotHandler {
         }
     }
 
+    // --- Helper Functions ---
 
     private void activateHumanMode(BotUser botUser, String reason) {
         botUser.setHumanMode(true);
-        botUser.setLastActiveTime(LocalDateTime.now()); // ✅ อัปเดตเวลาตอนเริ่มโหมดคนด้วย
+        botUser.setLastActiveTime(LocalDateTime.now());
         botUserRepository.save(botUser);
 
-        if (adminUserId != null && !adminUserId.isEmpty()) {
+        // 🟢 ตรวจสอบว่ามี Admin ให้ส่งหาหรือไม่
+        if (adminUserIds != null && !adminUserIds.isEmpty()) {
             try {
+                // ดึงโปรไฟล์ลูกค้า
                 var profile = messagingApiClient.getProfile(botUser.getUserId()).get();
+                // เตรียมข้อความแจ้งเตือน
                 List<Message> messages = getMessages(botUser, reason, profile);
 
-                messagingApiClient.pushMessage(
-                        UUID.randomUUID(),
-                        new PushMessageRequest(adminUserId, messages, false, null)
+                // ✅ แก้ไข: ใช้ MulticastRequest (ไม่มีคำว่า Message)
+                // พารามิเตอร์: (List<String> to, List<Message> messages, boolean notificationDisabled, List<String> customAggregationUnits)
+                MulticastRequest multicastRequest = new MulticastRequest(
+                        messages, // รายชื่อ Admin (List<String>)
+                        adminUserIds,     // ข้อความที่จะส่ง
+                        false,        // แจ้งเตือนปกติ (ไม่ปิด notification)
+                        null          // customAggregationUnits (ใส่ null ได้ถ้าไม่ใช้)
+                );
+
+                // สั่งยิง Multicast
+                messagingApiClient.multicast(
+                        UUID.randomUUID(), // X-Line-Retry-Key
+                        multicastRequest
                 ).get();
 
+                log.info("Notified {} admins about user {}", adminUserIds.size(), botUser.getUserId());
+
             } catch (Exception e) {
-                log.error("Failed to notify admin", e);
+                log.error("Failed to notify admins", e);
             }
         }
     }

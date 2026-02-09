@@ -20,7 +20,7 @@ services:
       # --- API Keys & Secrets (ดึงค่าจาก .env) ---
       - LINE_BOT_CHANNEL_TOKEN=${LINE_BOT_CHANNEL_TOKEN}
       - LINE_BOT_CHANNEL_SECRET=${LINE_BOT_CHANNEL_SECRET}
-      - LINE_ADMIN_USER_ID=${LINE_ADMIN_USER_ID}
+      - LINE_ADMIN_USER_IDS=${LINE_ADMIN_USER_IDS}
 
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_URL=https://api.openai.com/v1

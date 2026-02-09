@@ -19,7 +19,7 @@ line:
       path: /callback
 
   admin:
-    user-id: ${LINE_ADMIN_USER_ID}
+    user-ids: ${LINE_ADMIN_USER_IDS}
 
 openai:
   api:
