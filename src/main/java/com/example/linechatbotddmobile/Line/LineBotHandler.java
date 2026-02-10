@@ -33,7 +33,7 @@ public class LineBotHandler {
     private final BotUserRepository botUserRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 🟢 แก้ไขจุดที่ 1: เปลี่ยนจาก String เป็น List<String> เพื่อรับหลาย ID
+    // 🟢 รับค่า Admin IDs
     @Value("${line.admin.user-ids:}")
     private List<String> adminUserIds;
 
@@ -74,7 +74,6 @@ public class LineBotHandler {
             // ------------------------------------------------------------------
             // 👑 Admin Remote Control: แอดมินสั่งรีเซ็ตลูกค้าผ่านแชทส่วนตัว
             // ------------------------------------------------------------------
-            // 🟢 แก้ไขจุดที่ 2: เช็คว่าคนส่ง เป็นหนึ่งใน Admin หรือไม่
             if (event.message() instanceof TextMessageContent adminText && adminUserIds.contains(userId)) {
                 String command = adminText.text().trim();
                 // คำสั่ง: reset U1234...
@@ -116,6 +115,15 @@ public class LineBotHandler {
             // --------------------------------------------------
             if (event.message() instanceof TextMessageContent textContent) {
                 String userText = textContent.text().trim();
+
+                // ✅✅✅ ส่วนที่เพิ่มเข้ามาใหม่ (เช็ค ID ตัวเอง) ✅✅✅
+                // ต้องใส่ตรงนี้ เพื่อให้ใครก็ได้เช็ค ID ตัวเองได้ ก่อนจะเข้าเงื่อนไขอื่น
+                if ("#myid".equalsIgnoreCase(userText) || "#admin_id".equalsIgnoreCase(userText)) {
+                    String msg = "🆔 UserID ของคุณคือ:\n" + userId + "\n(Copy ไปใส่ใน application.properties ได้เลยครับ)";
+                    reply(replyToken, msg);
+                    return; // จบการทำงานทันที ไม่ต้องส่งเข้า AI
+                }
+                // ✅✅✅ จบส่วนที่เพิ่ม ✅✅✅
 
                 // 🛠️ Reset Bot (ลูกค้าพิมพ์เอง)
                 if ("bot_start".equalsIgnoreCase(userText) || "#reset".equalsIgnoreCase(userText)) {
@@ -184,7 +192,7 @@ public class LineBotHandler {
         }
     }
 
-    // --- Helper Functions ---
+    // --- Helper Functions (เหมือนเดิมทุกประการ) ---
 
     private void activateHumanMode(BotUser botUser, String reason) {
         botUser.setHumanMode(true);
@@ -199,13 +207,12 @@ public class LineBotHandler {
                 // เตรียมข้อความแจ้งเตือน
                 List<Message> messages = getMessages(botUser, reason, profile);
 
-                // ✅ แก้ไข: ใช้ MulticastRequest (ไม่มีคำว่า Message)
-                // พารามิเตอร์: (List<String> to, List<Message> messages, boolean notificationDisabled, List<String> customAggregationUnits)
+                // ใช้ MulticastRequest แบบเดิมตามที่คุณตั้งค่าไว้
                 MulticastRequest multicastRequest = new MulticastRequest(
                         messages, // รายชื่อ Admin (List<String>)
                         adminUserIds,     // ข้อความที่จะส่ง
-                        false,        // แจ้งเตือนปกติ (ไม่ปิด notification)
-                        null          // customAggregationUnits (ใส่ null ได้ถ้าไม่ใช้)
+                        false,        // แจ้งเตือนปกติ
+                        null
                 );
 
                 // สั่งยิง Multicast
