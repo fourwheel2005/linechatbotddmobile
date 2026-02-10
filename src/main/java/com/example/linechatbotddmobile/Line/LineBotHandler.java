@@ -119,7 +119,7 @@ public class LineBotHandler {
                 // ✅✅✅ ส่วนที่เพิ่มเข้ามาใหม่ (เช็ค ID ตัวเอง) ✅✅✅
                 // ต้องใส่ตรงนี้ เพื่อให้ใครก็ได้เช็ค ID ตัวเองได้ ก่อนจะเข้าเงื่อนไขอื่น
                 if ("#myid".equalsIgnoreCase(userText) || "#admin_id".equalsIgnoreCase(userText)) {
-                    String msg = "🆔 UserID ของคุณคือ:\n" + userId + "\n(Copy ไปใส่ใน application.properties ได้เลยครับ)";
+                    String msg = "🆔 UserID ของคุณคือ:\n" + userId;
                     reply(replyToken, msg);
                     return; // จบการทำงานทันที ไม่ต้องส่งเข้า AI
                 }
