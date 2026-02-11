@@ -4,9 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -14,7 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "bot_users")
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
+@Getter
+@Setter
 public class BotUser {
 
     @Id
@@ -29,4 +28,7 @@ public class BotUser {
 
     @Column(name = "last_active_time")
     private LocalDateTime lastActiveTime;
+
+    // สถานะ: "NORMAL", "WAIT_IMAGE", "WAIT_CREDIT", "WAIT_DOCS"
+    private String currentStatus = "NORMAL";
 }
