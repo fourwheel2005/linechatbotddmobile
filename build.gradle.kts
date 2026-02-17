@@ -2,6 +2,7 @@ plugins {
 	java
 	id("org.springframework.boot") version "3.4.5"
 	id("io.spring.dependency-management") version "1.1.7"
+
 }
 
 
@@ -33,6 +34,11 @@ dependencies {
 	implementation("com.linecorp.bot:line-bot-spring-boot-handler:8.4.0")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+	implementation("com.bucket4j:bucket4j-core:8.10.1")
+	implementation("com.linecorp.bot:line-bot-messaging-api-client:8.4.0")
+
+	// 2. Resilience4j (Circuit Breaker & Retry) - ป้องกัน OpenAI ล่มแล้วพาเราล่มด้วย
+	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 	compileOnly("org.projectlombok:lombok")
 	runtimeOnly("org.postgresql:postgresql")
 	annotationProcessor("org.projectlombok:lombok")

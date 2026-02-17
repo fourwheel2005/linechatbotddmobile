@@ -31,4 +31,7 @@ public class BotUser {
 
     // สถานะ: "NORMAL", "WAIT_IMAGE", "WAIT_CREDIT", "WAIT_DOCS"
     private String currentStatus = "NORMAL";
+
+    @Column(name = "handler_admin_id")
+    private String handlerAdminId;
 }
