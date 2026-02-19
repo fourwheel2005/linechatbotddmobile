@@ -34,4 +34,10 @@ public class BotUser {
 
     @Column(name = "handler_admin_id")
     private String handlerAdminId;
+
+    @Column(name = "display_name")
+    private String displayName;
+
+    @Column(name = "picture_url")
+    private String pictureUrl;
 }

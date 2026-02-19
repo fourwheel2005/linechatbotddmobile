@@ -200,6 +200,7 @@ public class LineBotHandler {
         String cleanResponse = cleanAiResponse(aiResponse)
                 .replace("[SHOW_HOWTO_IMAGE]", "")
                 .replace("[SHOW_15DAY_RULES]", "")
+                .replace("[SHOW_DOCS_MONTHLY]", "")
                 .trim();
 
         // ========== 6. Update Status Based on AI Response ==========
@@ -243,6 +244,27 @@ public class LineBotHandler {
             );
             sendCarouselMessage(replyToken, cleanResponse, "เงื่อนไขและกฎเหล็ก (15 วัน)", imageUrls);
         }
+
+        // 🟠 [เพิ่มใหม่] กรณี E: AI สั่งให้ขอเอกสารรายเดือน (Step 6A) ส่งข้อความพร้อมรูปภาพ
+        else if (aiResponse.contains("[SHOW_DOCS_MONTHLY]")) {
+            // ลิงก์รูปภาพตัวอย่างเอกสาร (คุณสามารถเปลี่ยนเป็นลิงก์รูปที่ต้องการได้เลยครับ)
+            String docImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8528063.jpg";
+
+            List<Message> messages = new ArrayList<>();
+            // 1. ใส่ข้อความของ AI
+            if (!cleanResponse.isEmpty()) {
+                messages.add(new TextMessage(cleanResponse));
+            }
+            // 2. ใส่รูปภาพ
+            messages.add(new ImageMessage(URI.create(docImageUrl), URI.create(docImageUrl)));
+
+            // 3. ส่ง 2 อย่างไปพร้อมกันใน 1 การตอบกลับ
+            replyMultiple(replyToken, messages);
+        }
+
+
+
+
 
         // 🔵 กรณี D: ตอบข้อความปกติ
         else {
@@ -700,11 +722,32 @@ public class LineBotHandler {
     private BotUser loadOrCreateUser(String userId) {
         BotUser user = botUserRepository.findById(userId).orElseGet(() -> {
             BotUser oldUser = createNewUser(userId);
-            oldUser.setHumanMode(true);
-            botUserRepository.save(oldUser);
+            oldUser.setHumanMode(true); // ตามโค้ดเดิมของคุณ
             return oldUser;
         });
+
+        // 🌟 [เพิ่มโค้ดส่วนนี้] เช็คว่าถ้ายังไม่มีชื่อ ให้ไปดึงโปรไฟล์จาก LINE API มาอัปเดต
+        if (user.getDisplayName() == null || user.getDisplayName().isEmpty()) {
+            try {
+                var profileResponse = messagingApiClient.getProfile(userId).get();
+                if (profileResponse != null && profileResponse.body() != null) {
+                    // เซฟชื่อไลน์
+                    user.setDisplayName(profileResponse.body().displayName());
+
+                    // เซฟรูปโปรไฟล์ (บางคนอาจจะไม่ได้ตั้งรูป ต้องเช็ค null ด้วย)
+                    if (profileResponse.body().pictureUrl() != null) {
+                        user.setPictureUrl(profileResponse.body().pictureUrl().toString());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("ไม่สามารถดึงโปรไฟล์ LINE ของลูกค้าได้: {}", userId, e);
+            }
+        }
+
+        // อัปเดตเวลาล่าสุดที่ใช้งาน
         user.setLastActiveTime(LocalDateTime.now());
+
+        // บันทึกลง Database
         botUserRepository.save(user);
         return user;
     }

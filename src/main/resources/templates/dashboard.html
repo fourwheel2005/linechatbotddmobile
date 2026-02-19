@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>DD Mobile - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-mobile-alt text-primary"></i> DD Mobile - Customer Monitor</h2>
+        <div class="card text-bg-primary">
+            <div class="card-body py-2 px-4">
+                <h5 class="card-title mb-0">ลูกค้าทั้งหมด: <span th:text="${totalUsers}">0</span> คน</h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>ชื่อลูกค้า (Customer)</th> <th>สถานะ (Status)</th>
+                    <th>โหมดคนตอบ?</th>
+                    <th>แอดมินที่ดูแล</th>
+                    <th>ใช้งานล่าสุด</th>
+                    <th>จัดการ</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="user, iterStat : ${users}">
+                    <td th:text="${iterStat.count}">1</td>
+
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img th:if="${user.pictureUrl != null}" th:src="${user.pictureUrl}"
+                                 class="rounded-circle me-2 shadow-sm" style="width: 35px; height: 35px; object-fit: cover;" alt="Profile Picture">
+                            <i th:unless="${user.pictureUrl != null}" class="fas fa-user-circle text-secondary me-2" style="font-size: 35px;"></i>
+
+                            <div>
+                                <strong th:text="${user.displayName != null ? user.displayName : 'ไม่ทราบชื่อ'}">Customer Name</strong>
+                                <br>
+                                <small class="text-muted" style="font-size: 0.75em;" th:text="${user.userId}">U12345...</small>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td>
+                            <span class="badge"
+                                  th:classappend="${user.currentStatus == 'NORMAL'} ? 'bg-secondary' :
+                                                 (${user.currentStatus == 'WAIT_IMAGE'} ? 'bg-warning text-dark' :
+                                                 (${user.currentStatus == 'WAIT_CREDIT'} ? 'bg-info text-dark' :
+                                                 (${user.currentStatus == 'WAIT_DOCS'} ? 'bg-primary' :
+                                                 (${user.currentStatus == 'WAIT_SIGNOUT'} ? 'bg-danger' : 'bg-dark'))))"
+                                  th:text="${user.currentStatus}">
+                                STATUS
+                            </span>
+                    </td>
+
+                    <td>
+                        <span th:if="${user.humanMode}" class="badge bg-danger">👩‍💻 แอดมินตอบ</span>
+                        <span th:unless="${user.humanMode}" class="badge bg-success">🤖 AI ตอบ</span>
+                    </td>
+
+                    <td>
+                        <span th:if="${user.handlerAdminId != null}" class="badge bg-info text-dark">
+                            <i class="fas fa-user-tie"></i>
+                            <span th:text="${adminNameMap[user.handlerAdminId]}">Admin Name</span>
+                        </span>
+                        <span th:unless="${user.handlerAdminId != null}" class="text-muted" style="font-size: 0.9em;">
+                            - ไม่มี -
+                        </span>
+                    </td>
+
+                    <td th:text="${#temporals.format(user.lastActiveTime, 'dd/MM/yyyy HH:mm')}">Date</td>
+                    <td>
+                        <a th:href="@{'/admin/chat/' + ${user.userId}}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-comments"></i> ดูแชท
+                        </a>
+                    </td>
+                </tr>
+
+                <tr th:if="${users.empty}">
+                    <td colspan="7" class="text-center text-muted py-4">ยังไม่มีลูกค้าในระบบ</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
