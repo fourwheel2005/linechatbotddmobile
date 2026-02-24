@@ -16,14 +16,17 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
-@RequestMapping("/admin")
+@RequestMapping("/admin") // 💡 ระบุว่าทุก URL ในคลาสนี้ต้องขึ้นต้นด้วย /admin อยู่แล้ว
 public class AdminController {
 
     private final BotUserRepository botUserRepository;
     private final ObjectMapper objectMapper;
-    private final MessagingApiClient messagingApiClient; // ✅ เพิ่มตัวดึงข้อมูลจาก LINE API
+    private final MessagingApiClient messagingApiClient;
+
     @Autowired
     private AdminUserRepository adminUserRepository;
+
+    @Autowired // 💡 [แถม] เพิ่ม @Autowired ป้องกัน Error ตอนจะเข้ารหัสผ่าน
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -58,12 +61,12 @@ public class AdminController {
 
         model.addAttribute("users", users);
         model.addAttribute("totalUsers", users.size());
-        model.addAttribute("adminNameMap", adminNameMap); // ✅ ส่ง Map รายชื่อไปให้หน้าเว็บ Thymeleaf
+        model.addAttribute("adminNameMap", adminNameMap);
 
         return "dashboard";
     }
 
-    // ฟีเจอร์ 2: หน้าดูประวัติแชทของลูกค้าแต่ละคน (คงเดิม)
+    // ฟีเจอร์ 2: หน้าดูประวัติแชทของลูกค้าแต่ละคน
     @GetMapping("/chat/{userId}")
     public String chatLog(@PathVariable String userId, Model model) {
         BotUser botUser = botUserRepository.findById(userId).orElse(null);
@@ -89,14 +92,16 @@ public class AdminController {
 
         return "chat-log";
     }
-    @GetMapping("/admin/manage")
+
+    // ฟีเจอร์ 3: หน้าจอจัดการแอดมิน (เอา /admin ออกเพื่อไม่ให้ Path เบิ้ล)
+    @GetMapping("/manage")
     public String manageAdmins(Model model) {
         model.addAttribute("admins", adminUserRepository.findAll());
         return "manage-admins"; // ชื่อไฟล์ HTML
     }
 
-    // ฟังก์ชันรับข้อมูลเพื่อสร้างแอดมินใหม่
-    @PostMapping("/admin/add-admin")
+    // ฟังก์ชันรับข้อมูลเพื่อสร้างแอดมินใหม่ (เอา /admin ออก)
+    @PostMapping("/add-admin")
     public String addAdmin(@RequestParam String username, @RequestParam String password, Model model) {
         if (adminUserRepository.findByUsername(username).isPresent()) {
             return "redirect:/admin/manage?error=true"; // ถ้าชื่อซ้ำให้เด้งกลับไปพร้อมแจ้ง Error
@@ -110,7 +115,8 @@ public class AdminController {
         return "redirect:/admin/manage?success=true";
     }
 
-    @PostMapping("/admin/sync-profiles")
+    // ฟีเจอร์ 4: ซิงค์โปรไฟล์ลูกค้าเก่า (เอา /admin ออก)
+    @PostMapping("/sync-profiles")
     public String syncOldProfiles(RedirectAttributes redirectAttributes) {
         List<BotUser> users = botUserRepository.findAll();
         int syncCount = 0;
@@ -132,8 +138,12 @@ public class AdminController {
                         syncCount++;
                     }
                 } catch (Exception e) {
-                    // กรณีที่ดึงไม่ได้ (เช่น ลูกค้าบล็อกบอทไปแล้ว) ระบบจะข้ามไปทำคนถัดไป
+                    // 🌟 [แก้ปัญหา Log วนลูป] กรณีที่ดึงไม่ได้ (เช่น ลูกค้าบล็อกบอทไปแล้ว)
                     System.err.println("ไม่สามารถดึงข้อมูลโปรไฟล์ของ UserID: " + user.getUserId());
+
+                    // เซ็ตชื่อบอกไปเลยว่าบล็อกบอท ระบบจะได้ไม่กลับมาพยายามดึงข้อมูลคนนี้ซ้ำอีก!
+                    user.setDisplayName("ไม่มีข้อมูล (ลบ/บล็อกบอท)");
+                    botUserRepository.save(user);
                 }
             }
         }
