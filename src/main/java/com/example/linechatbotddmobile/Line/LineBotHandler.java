@@ -235,11 +235,19 @@ public class LineBotHandler {
         }
 
         else if (aiResponse.contains("[SHOW_HOWTO_IMAGE_2]")) {
-            // URL รูปภาพสำหรับ iphone 2 เครื่อง
-            List<String> imageUrls = Arrays.asList(
-                    "https://raw.githubusercontent.com/fourwheel2005/image/main/S__7593993.jpg"
-            );
-            sendCarouselMessage(replyToken, cleanResponse, "เพราะอะไรถึงต้องมี 2 เครื่อง (รายเดือน)", imageUrls);
+            // ลิงก์รูปภาพตัวอย่างเอกสาร (คุณสามารถเปลี่ยนเป็นลิงก์รูปที่ต้องการได้เลยครับ)
+            String docImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__7593993.jpg";
+
+            List<Message> messages = new ArrayList<>();
+            // 1. ใส่ข้อความของ AI
+            if (!cleanResponse.isEmpty()) {
+                messages.add(new TextMessage(cleanResponse));
+            }
+            // 2. ใส่รูปภาพ
+            messages.add(new ImageMessage(URI.create(docImageUrl), URI.create(docImageUrl)));
+
+            // 3. ส่ง 2 อย่างไปพร้อมกันใน 1 การตอบกลับ
+            replyMultiple(replyToken, messages);
         }
 
         // 🟢 กรณี C: AI สั่งให้โชว์กฎเหล็ก 15 วัน (Step 5B - ราย 15 วัน) 🔥 เพิ่มใหม่ตรงนี้
