@@ -6,11 +6,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.messaging.client.MessagingApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,6 +21,9 @@ public class AdminController {
     private final BotUserRepository botUserRepository;
     private final ObjectMapper objectMapper;
     private final MessagingApiClient messagingApiClient; // ✅ เพิ่มตัวดึงข้อมูลจาก LINE API
+    @Autowired
+    private AdminUserRepository adminUserRepository;
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     public AdminController(BotUserRepository botUserRepository, MessagingApiClient messagingApiClient) {
@@ -85,5 +87,25 @@ public class AdminController {
         model.addAttribute("chatHistory", chatHistory);
 
         return "chat-log";
+    }
+    @GetMapping("/admin/manage")
+    public String manageAdmins(Model model) {
+        model.addAttribute("admins", adminUserRepository.findAll());
+        return "manage-admins"; // ชื่อไฟล์ HTML
+    }
+
+    // ฟังก์ชันรับข้อมูลเพื่อสร้างแอดมินใหม่
+    @PostMapping("/admin/add-admin")
+    public String addAdmin(@RequestParam String username, @RequestParam String password, Model model) {
+        if (adminUserRepository.findByUsername(username).isPresent()) {
+            return "redirect:/admin/manage?error=true"; // ถ้าชื่อซ้ำให้เด้งกลับไปพร้อมแจ้ง Error
+        }
+
+        AdminUser newUser = new AdminUser();
+        newUser.setUsername(username);
+        newUser.setPassword(passwordEncoder.encode(password)); // เข้ารหัสผ่านให้ปลอดภัย
+        adminUserRepository.save(newUser);
+
+        return "redirect:/admin/manage?success=true";
     }
 }

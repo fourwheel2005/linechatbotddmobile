@@ -5,93 +5,164 @@
     <title>DD Mobile - Admin Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .table-hover tbody tr:hover { background-color: #f8f9fa; transform: scale(1.005); transition: all 0.2s; }
+        .badge { padding: 0.5em 0.8em; border-radius: 8px; font-weight: 500; }
+        .header-gradient { background: linear-gradient(135deg, #0d6efd, #0dcaf0); color: white; border-radius: 12px; padding: 20px; }
+    </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-mobile-alt text-primary"></i> DD Mobile - Customer Monitor</h2>
-        <div class="card text-bg-primary">
-            <div class="card-body py-2 px-4">
-                <h5 class="card-title mb-0">ลูกค้าทั้งหมด: <span th:text="${totalUsers}">0</span> คน</h5>
+<div class="container mt-4 mb-5">
+    <div class="header-gradient d-flex justify-content-between align-items-center mb-4 shadow-sm">
+        <h2 class="mb-0 fw-bold"><i class="fas fa-mobile-alt me-2"></i> DD Mobile Monitor</h2>
+        <div class="d-flex align-items-center">
+            <small class="text-white-50 me-3"><i class="fas fa-sync-alt fa-spin me-1"></i> อัปเดตอัตโนมัติ</small>
+            <div class="bg-white text-primary px-4 py-2 rounded-pill fw-bold shadow-sm">
+                <i class="fas fa-users me-1"></i> ลูกค้าทั้งหมด: <span th:text="${totalUsers}" class="fs-5">0</span>
             </div>
         </div>
     </div>
 
+    <div class="d-flex justify-content-end mb-3">
+        <div style="width: 250px;">
+            <select id="statusFilter" class="form-select border-0 shadow-sm text-muted fw-bold">
+                <option value="ALL">🔍 ทั้งหมด (All Status)</option>
+                <option value="NORMAL">ปกติ (NORMAL)</option>
+                <option value="WAIT_IMAGE">📸 รอตรวจรูป (WAIT_IMAGE)</option>
+                <option value="WAIT_CREDIT">💳 รอเช็คเครดิต (WAIT_CREDIT)</option>
+                <option value="WAIT_DOCS">📄 รอเอกสาร (WAIT_DOCS)</option>
+                <option value="WAIT_SIGNOUT">☁️ รอ Sign Out (WAIT_SIGNOUT)</option>
+            </select>
+        </div>
+    </div>
+
     <div class="card shadow-sm">
-        <div class="card-body">
-            <table class="table table-hover align-middle">
-                <thead class="table-dark">
-                <tr>
-                    <th>#</th>
-                    <th>ชื่อลูกค้า (Customer)</th> <th>สถานะ (Status)</th>
-                    <th>โหมดคนตอบ?</th>
-                    <th>แอดมินที่ดูแล</th>
-                    <th>ใช้งานล่าสุด</th>
-                    <th>จัดการ</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="user, iterStat : ${users}">
-                    <td th:text="${iterStat.count}">1</td>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-muted" style="border-bottom: 2px solid #e9ecef;">
+                    <tr>
+                        <th class="ps-4">#</th>
+                        <th>ชื่อลูกค้า (Customer)</th>
+                        <th>สถานะ (Status)</th>
+                        <th>ผู้ดูแล (Handler)</th>
+                        <th>ใช้งานล่าสุด</th>
+                    </tr>
+                    </thead>
+                    <tbody id="userTableBody">
 
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <img th:if="${user.pictureUrl != null}" th:src="${user.pictureUrl}"
-                                 class="rounded-circle me-2 shadow-sm" style="width: 35px; height: 35px; object-fit: cover;" alt="Profile Picture">
-                            <i th:unless="${user.pictureUrl != null}" class="fas fa-user-circle text-secondary me-2" style="font-size: 35px;"></i>
+                    <tr th:each="user, iterStat : ${users}" class="border-bottom user-row" th:data-status="${user.currentStatus}">
+                        <td th:text="${iterStat.count}" class="ps-4 text-muted">1</td>
 
-                            <div>
-                                <strong th:text="${user.displayName != null ? user.displayName : 'ไม่ทราบชื่อ'}">Customer Name</strong>
-                                <br>
-                                <small class="text-muted" style="font-size: 0.75em;" th:text="${user.userId}">U12345...</small>
+                        <td>
+                            <div class="d-flex align-items-center py-2">
+                                <img th:if="${user.pictureUrl != null}" th:src="${user.pictureUrl}"
+                                     class="rounded-circle me-3 shadow-sm border" style="width: 45px; height: 45px; object-fit: cover;" alt="Profile">
+                                <i th:unless="${user.pictureUrl != null}" class="fas fa-user-circle text-secondary me-3" style="font-size: 45px;"></i>
+                                <div>
+                                    <strong class="text-dark" th:text="${user.displayName != null ? user.displayName : 'ไม่ทราบชื่อ'}">Customer Name</strong>
+                                    <br>
+                                    <span class="text-muted" style="font-size: 0.75rem;"><i class="fas fa-id-badge"></i> <span th:text="${user.userId}">U12345...</span></span>
+                                </div>
                             </div>
-                        </div>
-                    </td>
+                        </td>
 
-                    <td>
+                        <td>
                             <span class="badge"
-                                  th:classappend="${user.currentStatus == 'NORMAL'} ? 'bg-secondary' :
+                                  th:classappend="${user.currentStatus == 'NORMAL'} ? 'bg-secondary text-white' :
                                                  (${user.currentStatus == 'WAIT_IMAGE'} ? 'bg-warning text-dark' :
                                                  (${user.currentStatus == 'WAIT_CREDIT'} ? 'bg-info text-dark' :
-                                                 (${user.currentStatus == 'WAIT_DOCS'} ? 'bg-primary' :
-                                                 (${user.currentStatus == 'WAIT_SIGNOUT'} ? 'bg-danger' : 'bg-dark'))))"
+                                                 (${user.currentStatus == 'WAIT_DOCS'} ? 'bg-primary text-white' :
+                                                 (${user.currentStatus == 'WAIT_SIGNOUT'} ? 'bg-danger text-white' : 'bg-dark text-white'))))"
                                   th:text="${user.currentStatus}">
                                 STATUS
                             </span>
-                    </td>
+                        </td>
 
-                    <td>
-                        <span th:if="${user.humanMode}" class="badge bg-danger">👩‍💻 แอดมินตอบ</span>
-                        <span th:unless="${user.humanMode}" class="badge bg-success">🤖 AI ตอบ</span>
-                    </td>
+                        <td>
+                            <span th:if="${user.humanMode}" class="badge bg-danger mb-1"><i class="fas fa-user"></i> แอดมินตอบ</span>
+                            <span th:unless="${user.humanMode}" class="badge bg-success mb-1"><i class="fas fa-robot"></i> AI ตอบ</span>
+                            <br>
+                            <small th:if="${user.handlerAdminId != null}" class="text-primary fw-bold">
+                                <i class="fas fa-user-tie"></i> <span th:text="${adminNameMap[user.handlerAdminId]}">Admin</span>
+                            </small>
+                            <small th:unless="${user.handlerAdminId != null}" class="text-muted">- ยังไม่มีผู้รับงาน -</small>
+                        </td>
 
-                    <td>
-                        <span th:if="${user.handlerAdminId != null}" class="badge bg-info text-dark">
-                            <i class="fas fa-user-tie"></i>
-                            <span th:text="${adminNameMap[user.handlerAdminId]}">Admin Name</span>
-                        </span>
-                        <span th:unless="${user.handlerAdminId != null}" class="text-muted" style="font-size: 0.9em;">
-                            - ไม่มี -
-                        </span>
-                    </td>
+                        <td class="text-muted" style="font-size: 0.9rem;">
+                            <i class="far fa-clock"></i> <span th:text="${#temporals.format(user.lastActiveTime, 'dd/MM/yyyy HH:mm')}">Date</span>
+                        </td>
+                    </tr>
 
-                    <td th:text="${#temporals.format(user.lastActiveTime, 'dd/MM/yyyy HH:mm')}">Date</td>
-                    <td>
-                        <a th:href="@{'/admin/chat/' + ${user.userId}}" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-comments"></i> ดูแชท
-                        </a>
-                    </td>
-                </tr>
+                    <tr th:if="${users.empty}">
+                        <td colspan="5" class="text-center text-muted py-5">
+                            <i class="fas fa-box-open fs-1 mb-3 text-light"></i><br>
+                            ยังไม่มีลูกค้าในระบบ
+                        </td>
+                    </tr>
 
-                <tr th:if="${users.empty}">
-                    <td colspan="7" class="text-center text-muted py-4">ยังไม่มีลูกค้าในระบบ</td>
-                </tr>
-                </tbody>
-            </table>
+                    <tr id="noFilterMatchRow" style="display: none;">
+                        <td colspan="5" class="text-center text-muted py-5">
+                            <i class="fas fa-filter fs-1 mb-3 text-light"></i><br>
+                            ไม่พบลูกค้าในสถานะนี้
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const filterDropdown = document.getElementById("statusFilter");
+        const userRows = document.querySelectorAll(".user-row");
+        const noFilterMatchRow = document.getElementById("noFilterMatchRow");
+
+        // โหลดค่า Filter เดิมจาก Session Storage (ป้องกันค่าหายตอน Auto-refresh)
+        const savedStatus = sessionStorage.getItem("dashboardFilterStatus") || "ALL";
+        filterDropdown.value = savedStatus;
+        applyFilter(savedStatus);
+
+        // ดักจับเหตุการณ์เมื่อมีการเลือกสถานะใหม่
+        filterDropdown.addEventListener("change", function() {
+            const selectedStatus = this.value;
+            sessionStorage.setItem("dashboardFilterStatus", selectedStatus);
+            applyFilter(selectedStatus);
+        });
+
+        // ฟังก์ชันซ่อน/แสดงแถว
+        function applyFilter(status) {
+            let visibleCount = 0;
+            userRows.forEach(row => {
+                if (status === "ALL" || row.getAttribute("data-status") === status) {
+                    row.style.display = ""; // แสดง
+                    visibleCount++;
+                } else {
+                    row.style.display = "none"; // ซ่อน
+                }
+            });
+
+            // เช็คว่าถ้าหาไม่เจอสักคนเลย (แต่มีคนในระบบ) ให้โชว์ข้อความ "ไม่พบลูกค้า"
+            if (userRows.length > 0) {
+                if (visibleCount === 0) {
+                    noFilterMatchRow.style.display = "";
+                } else {
+                    noFilterMatchRow.style.display = "none";
+                }
+            }
+        }
+    });
+
+    // รีเฟรชหน้า Dashboard ทุกๆ 15 วินาที
+    setTimeout(function() {
+        window.location.reload();
+    }, 15000);
+</script>
 
 </body>
 </html>

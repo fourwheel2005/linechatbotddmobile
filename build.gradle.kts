@@ -36,6 +36,10 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
 	implementation("com.bucket4j:bucket4j-core:8.10.1")
 	implementation("com.linecorp.bot:line-bot-messaging-api-client:8.4.0")
+	// 🌟 [เพิ่มใหม่] Spring Security สำหรับทำระบบ Login/Register
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	// 🌟 [เพิ่มใหม่] เสริมพลังให้ Thymeleaf รู้จักกับ Security (เผื่อซ่อน/โชว์ปุ่มตามสถานะ Login)
+	implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
 
 	// 2. Resilience4j (Circuit Breaker & Retry) - ป้องกัน OpenAI ล่มแล้วพาเราล่มด้วย
 	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
