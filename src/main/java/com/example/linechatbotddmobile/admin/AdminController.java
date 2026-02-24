@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -107,5 +108,43 @@ public class AdminController {
         adminUserRepository.save(newUser);
 
         return "redirect:/admin/manage?success=true";
+    }
+
+    @PostMapping("/admin/sync-profiles")
+    public String syncOldProfiles(RedirectAttributes redirectAttributes) {
+        List<BotUser> users = botUserRepository.findAll();
+        int syncCount = 0;
+
+        for (BotUser user : users) {
+            // ค้นหาเฉพาะคนที่ยังไม่มีชื่อ หรือชื่อเป็น "ไม่ทราบชื่อ"
+            if (user.getDisplayName() == null || user.getDisplayName().isEmpty() || "ไม่ทราบชื่อ".equals(user.getDisplayName())) {
+                try {
+                    // เรียก API ของ LINE เพื่อดึงข้อมูลโปรไฟล์ล่าสุด
+                    var profileResponse = messagingApiClient.getProfile(user.getUserId()).get();
+                    if (profileResponse != null && profileResponse.body() != null) {
+                        user.setDisplayName(profileResponse.body().displayName());
+
+                        if (profileResponse.body().pictureUrl() != null) {
+                            user.setPictureUrl(profileResponse.body().pictureUrl().toString());
+                        }
+
+                        botUserRepository.save(user); // บันทึกลงฐานข้อมูล
+                        syncCount++;
+                    }
+                } catch (Exception e) {
+                    // กรณีที่ดึงไม่ได้ (เช่น ลูกค้าบล็อกบอทไปแล้ว) ระบบจะข้ามไปทำคนถัดไป
+                    System.err.println("ไม่สามารถดึงข้อมูลโปรไฟล์ของ UserID: " + user.getUserId());
+                }
+            }
+        }
+
+        // ส่งข้อความแจ้งเตือนกลับไปที่หน้าเว็บ
+        if (syncCount > 0) {
+            redirectAttributes.addFlashAttribute("syncSuccess", "✅ อัปเดตข้อมูลโปรไฟล์ลูกค้าเก่าสำเร็จจำนวน " + syncCount + " คน");
+        } else {
+            redirectAttributes.addFlashAttribute("syncInfo", "ℹ️ ข้อมูลโปรไฟล์ลูกค้าอัปเดตเป็นปัจจุบันครบทุกคนแล้วครับ");
+        }
+
+        return "redirect:/admin/dashboard"; // ทำเสร็จให้เด้งกลับไปหน้า Dashboard
     }
 }
