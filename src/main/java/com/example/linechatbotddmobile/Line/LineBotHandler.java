@@ -234,6 +234,14 @@ public class LineBotHandler {
             sendCarouselMessage(replyToken, cleanResponse, "วิธีการเตรียมเครื่อง (รายเดือน)", imageUrls);
         }
 
+        else if (aiResponse.contains("[SHOW_HOWTO_IMAGE_2]")) {
+            // URL รูปภาพสำหรับ iphone 2 เครื่อง
+            List<String> imageUrls = Arrays.asList(
+                    "https://raw.githubusercontent.com/fourwheel2005/image/main/S__7593993.jpg"
+            );
+            sendCarouselMessage(replyToken, cleanResponse, "เพราะอะไรถึงต้องมี 2 เครื่อง (รายเดือน)", imageUrls);
+        }
+
         // 🟢 กรณี C: AI สั่งให้โชว์กฎเหล็ก 15 วัน (Step 5B - ราย 15 วัน) 🔥 เพิ่มใหม่ตรงนี้
         else if (aiResponse.contains("[SHOW_15DAY_RULES]")) {
             // URL รูปภาพสำหรับ 15 วัน (เงื่อนไข, กฎเหล็ก, เอกสาร)
