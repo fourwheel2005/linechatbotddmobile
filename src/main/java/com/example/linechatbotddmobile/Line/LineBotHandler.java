@@ -199,6 +199,7 @@ public class LineBotHandler {
         // Clean Response: ลบ Tag คำสั่งออกจากข้อความที่จะบันทึก
         String cleanResponse = cleanAiResponse(aiResponse)
                 .replace("[SHOW_HOWTO_IMAGE]", "")
+                .replace("[SHOW_HOWTO_IMAGE_2]","")
                 .replace("[SHOW_15DAY_RULES]", "")
                 .replace("[SHOW_DOCS_MONTHLY]", "")
                 .trim();
