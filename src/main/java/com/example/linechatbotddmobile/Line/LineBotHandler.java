@@ -60,6 +60,7 @@ public class LineBotHandler {
     private static final String STATUS_WAIT_CREDIT = "WAIT_CREDIT";
     private static final String STATUS_WAIT_DOCS = "WAIT_DOCS";
     private static final String STATUS_WAIT_SIGNOUT = "WAIT_SIGNOUT";
+    private static final String STATUS_WAIT_BACKUP = "WAIT_BACKUP";
 
 
     @Autowired
@@ -551,6 +552,15 @@ public class LineBotHandler {
                     isApproved ? "ดำเนินการต่อ Step 6B (ขอเอกสารสำหรับ Flow 15 วัน)" : "แจ้งลูกค้าว่ารูป Sign Out ยังไม่ถูกต้อง ให้ลองใหม่"
             );
         }
+
+        // 🟢 4. เพิ่มคำสั่งบังคับ AI ตรงนี้
+        else if (STATUS_WAIT_BACKUP.equals(previousStatus)) {
+            signal = String.format(
+                    "แอดมินเข้าไปช่วยตอบคำถามลูกค้าและกดปุ่ม%s (ลูกค้าเข้าใจและเตรียมเครื่องเรียบร้อยแล้ว)\nคำสั่ง: %s",
+                    approvalText,
+                    isApproved ? "ดำเนินการต่อ Step 6A (ขอเอกสารรายเดือน) ทันที ห้ามถามย้อนกลับไป Step 5A อีก" : "แจ้งลูกค้าว่าหากพร้อมเมื่อไหร่ให้ทักมาใหม่นะครับ"
+            );
+        }
         // ---------------------------
         else {
             signal = String.format("แอดมินกดปุ่ม%s", approvalText);
@@ -676,25 +686,35 @@ public class LineBotHandler {
     }
 
     private void updateStatusFromAiResponse(String aiResponse, BotUser botUser) {
-        // --- 1. เช็คกลุ่ม WAIT_DOCS (ส่งเอกสารทั้ง รายเดือน และ 15 วัน) ---
-        if (aiResponse.contains("สเตทเม้น") ||        // รายเดือน
+
+        // 🟢 1. ย้าย WAIT_BACKUP ขึ้นมาเช็คเป็นอันดับแรกสุด!
+        // (ป้องกันบั๊กประโยค Step 5A ที่มีคำว่า "เอกสาร" ปนอยู่ด้วย)
+        if (aiResponse.contains("สำรองข้อมูล") ||
+                aiResponse.contains("ล้างเครื่อง") ||
+                aiResponse.contains("Backup") ||
+                aiResponse.contains("Reset")) {
+
+            botUser.setCurrentStatus(STATUS_WAIT_BACKUP);
+            log.info("Status changed to WAIT_BACKUP for user {}", botUser.getUserId());
+        }
+
+        // --- 2. เช็คกลุ่ม WAIT_DOCS (ส่งเอกสารทั้ง รายเดือน และ 15 วัน) ---
+        else if (aiResponse.contains("สเตทเม้น") ||
                 aiResponse.contains("เอกสาร") ||
-                aiResponse.contains("บัตรประชาชน") || // ทั้งคู่
+                aiResponse.contains("บัตรประชาชน") ||
                 aiResponse.contains("รูปหน้าร้าน") ||
                 aiResponse.contains("ข้อมูลทั้งหมด") ||
-
-                // 🔥 [เพิ่มใหม่] Keywords เฉพาะของ Flow 15 วัน (Step 6B) 🔥
                 aiResponse.contains("หน้าปก Facebook") ||
                 aiResponse.contains("Battery Health") ||
                 aiResponse.contains("รหัสหน้าจอ") ||
-                aiResponse.contains("ลิ้งค์") ||       // ขอลิ้งค์ Facebook/Line
+                aiResponse.contains("ลิ้งค์") ||
                 aiResponse.contains("Selfie")) {
 
-            botUser.setCurrentStatus(STATUS_WAIT_DOCS); // ✅ ให้เป็นสถานะรอเอกสารเหมือนกัน
+            botUser.setCurrentStatus(STATUS_WAIT_DOCS);
             log.info("Status changed to WAIT_DOCS for user {}", botUser.getUserId());
         }
 
-        // --- 2. เช็คกลุ่ม WAIT_SIGNOUT (ขั้นตอน Step 5B) ---
+        // --- 3. เช็คกลุ่ม WAIT_SIGNOUT (ขั้นตอน Step 5B) ---
         else if (aiResponse.contains("Sign Out") ||
                 aiResponse.contains("ลงชื่อออก") ||
                 aiResponse.contains("หลักฐานการลบ")) {
@@ -703,7 +723,7 @@ public class LineBotHandler {
             log.info("Status changed to WAIT_SIGNOUT for user {}", botUser.getUserId());
         }
 
-        // --- 3. เช็คกลุ่ม WAIT_IMAGE (เช็คสภาพทั่วไป / Step 2) ---
+        // --- 4. เช็คกลุ่ม WAIT_IMAGE (เช็คสภาพทั่วไป / Step 2) ---
         else if (aiResponse.contains("ถ่ายรูปรอบเครื่อง") ||
                 aiResponse.contains("Settings") ||
                 aiResponse.contains("เช็คโมเดล")) {
@@ -837,6 +857,13 @@ public class LineBotHandler {
                 detailText = "ลูกค้าส่งภาพ Sign Out iCloud\nสาเหตุ: " + reason;
                 btnApproveLabel = "✅ Sign Out แล้ว"; // ปุ่มอนุมัติ
                 btnRejectLabel = "❌ ยังไม่ผ่าน/มีเมล"; // ปุ่มปฏิเสธ
+            }
+            case STATUS_WAIT_BACKUP -> {
+                title = "💾 ช่วยลูกค้า Step 5A";
+                detailText = "ลูกค้าติดปัญหาล้างเครื่อง/Backup\nสาเหตุ: " + reason;
+
+                btnApproveLabel = "✅ ให้บอททำต่อ";
+                btnRejectLabel = "❌ ลูกค้ายกเลิก";
             }
             // ---------------------------
             default -> {
