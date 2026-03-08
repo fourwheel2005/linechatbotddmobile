@@ -238,6 +238,11 @@ public class LineBotHandler {
         if (aiResponse.contains("[CALL_ADMIN]")) {
             reply(replyToken, cleanResponse);
 
+            // 🌟 [สิ่งต้องเพิ่ม] บังคับ AI หลับทันที และเปลี่ยนสถานะเพื่อส่งต่อให้ด่านหลัง
+            botUser.setHumanMode(true);
+            botUser.setCurrentStatus("WAIT_ADMIN");
+            botUserRepository.save(botUser); // เซฟลงฐานข้อมูล
+
             // แจ้งเตือนแอดมิน (เข้าสู่โหมด Human)
             notifyAdminDirectly(botUser, "🚨 ลูกค้าแจ้งเรื่องสำคัญ / ส่งเอกสารครบแล้ว / ต้องการคุยกับคน");
             activateHumanMode(botUser, "AI ส่งไม้ต่อ: " + userText);
@@ -484,6 +489,17 @@ public class LineBotHandler {
 
         // 🔍 เก็บสถานะเดิมไว้ก่อน (เพื่อให้ AI รู้บริบทว่าเมื่อกี้ลูกค้าทำอะไรอยู่)
         String previousStatus = targetUser.getCurrentStatus();
+
+        // 🚨 [สิ่งที่คุณต้องก๊อปปี้ไปแทรกเพิ่มตรงนี้ครับ] 🚨
+        if ("WAIT_ADMIN".equals(previousStatus)) {
+            // กรณีแอดมินกดปุ่ม "✅ รับเรื่องแล้ว" (จากเหตุการณ์ AI ส่งไม้ต่อ)
+            targetUser.setHumanMode(true); // บังคับให้เป็นโหมดคนตอบ (AI หลับยาว)
+            botUserRepository.save(targetUser);
+
+            reply(replyToken, "✅ ล็อคเคสเรียบร้อย! เชิญคุณเข้าไปแชทปิดการขายได้เลยครับ\n(บอทจะหยุดกวนใจจนกว่าจะพิมพ์ #reset)");
+            return; // ⛔ จบการทำงานตรงนี้เลย ไม่ต้องไปปลุก AI
+        }
+        // 🚨 ----------------------------------------- 🚨
 
         // 3. ปลดล็อคและรีเซ็ตสถานะลูกค้า
         targetUser.setHumanMode(false);             // คืนร่างให้ AI ตอบ
