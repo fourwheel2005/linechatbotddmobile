@@ -87,6 +87,9 @@ public class LineBotHandler {
     // =========================================================================
     // Event 2: มีข้อความเข้า (Text / Image)
     // =========================================================================
+    // =========================================================================
+    // Event 2: มีข้อความเข้า (Text / Image)
+    // =========================================================================
     @EventMapping
     public void handleEvent(MessageEvent event) {
         try {
@@ -105,6 +108,21 @@ public class LineBotHandler {
             // ------------------------------------------------------------------
             BotUser botUser = loadOrCreateUser(userId);
             List<Map<String, String>> currentHistory = parseHistory(botUser.getChatHistoryJson());
+
+            // ------------------------------------------------------------------
+            // 🛑 [หัวใจสำคัญ] กำแพงเหล็ก ปิดปาก AI 100% ระหว่างแอดมินคุย
+            // ------------------------------------------------------------------
+            if (botUser.isHumanMode()) {
+                if (event.message() instanceof TextMessageContent textContent) {
+                    String text = textContent.text().trim();
+                    // ยอมให้ผ่านเฉพาะคำสั่งปลุก AI เท่านั้น นอกนั้นตัดบททิ้งหมด
+                    if (!text.equalsIgnoreCase("#reset") && !text.equalsIgnoreCase("bot_start")) {
+                        return; // 🤫 แอดมินคุยอยู่ -> บอทเงียบ 100% ไม่ยุ่งเลย
+                    }
+                } else {
+                    return; // 🤫 ลูกค้าส่งรูปภาพ ส่งสติ๊กเกอร์ หรืออื่นๆ -> บอทก็เงียบ 100%
+                }
+            }
 
             // ------------------------------------------------------------------
             // 📝 Text Message Handling
@@ -645,20 +663,27 @@ public class LineBotHandler {
     }
 
     private boolean handleHumanMode(String userText, BotUser botUser) {
-        if (RESUME_KEYWORDS.stream().anyMatch(userText::contains)) {
-            log.info("Resume command detected from user {}. Switching back to AI.", botUser.getUserId());
+        // 🛑 ปิดระบบปลุก AI ด้วยคำทั่วไป (WAKE_WORDS / RESUME_KEYWORDS) ทิ้งไปเลย
+        // เพื่อป้องกันปัญหา AI ตื่นมาแย่งแอดมินตอบระหว่างที่คนกำลังคุยกัน
+
+        // 🟢 อนุญาตให้ AI ตื่นได้เฉพาะกรณีที่ลูกค้าตั้งใจพิมพ์คำสั่งเรียกบอทจริงๆ เท่านั้น
+        if (userText.equalsIgnoreCase("คุยกับบอท") ||
+                userText.equalsIgnoreCase("กลับเมนูหลัก") ||
+                userText.equalsIgnoreCase("เริ่มใหม่")) {
+
+            log.info("User {} manually switched back to AI mode.", botUser.getUserId());
+
+            // ปลดโหมดคนตอบ คืนร่างให้ AI
             botUser.setHumanMode(false);
-            botUser.setCurrentStatus(STATUS_NORMAL);
+            botUser.setCurrentStatus(STATUS_NORMAL); // เริ่มสถานะใหม่
+            botUser.setHandlerAdminId(null); // เคลียร์แอดมินที่กำลังดูแลอยู่ออก
             botUserRepository.save(botUser);
-            return true;
+
+            return true; // อนุญาตให้ AI รับข้อความนี้ไปทำงานต่อ
         }
-        if (WAKE_WORDS.stream().anyMatch(userText::contains)) {
-            log.info("Wake word detected! Switching user {} to AI mode.", botUser.getUserId());
-            botUser.setHumanMode(false);
-            botUser.setCurrentStatus(STATUS_NORMAL);
-            botUserRepository.save(botUser);
-            return true;
-        }
+
+        // 🤫 นอกเหนือจากนั้น ถ้าลูกค้าพิมพ์คำอื่นๆ ให้รีเทิร์น false
+        // (แปลว่า AI จะเงียบ 100% ปล่อยให้แอดมินคุยต่อได้อย่างอิสระ)
         return false;
     }
 
