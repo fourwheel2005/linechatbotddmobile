@@ -124,15 +124,11 @@ public class LineBotHandler {
                 }
             }
 
-            // ------------------------------------------------------------------
-            // 📝 Text Message Handling
-            // ------------------------------------------------------------------
+
             if (event.message() instanceof TextMessageContent textContent) {
                 handleTextMessage(textContent, botUser, currentHistory, replyToken, userId);
             }
-            // ------------------------------------------------------------------
-            // 📸 Image Message Handling
-            // ------------------------------------------------------------------
+
             else if (event.message() instanceof ImageMessageContent) {
                 handleImageMessage(botUser, currentHistory, replyToken, userId);
             }
@@ -176,8 +172,7 @@ public class LineBotHandler {
             botUser.setCurrentStatus(STATUS_NORMAL);
             botUser.setHandlerAdminId(null); // ✅ ล้างชื่อแอดมินที่รับงาน
 
-            // (Optional) ล้าง Cooldown แจ้งเตือน ถ้ามีตัวแปรนี้
-            // if (notifyCooldownMap != null) notifyCooldownMap.remove(userId);
+
 
             botUserRepository.save(botUser);
             reply(replyToken, "🤖 น้องดีดี (AI) กลับมาประจำการแล้วครับ! (Reset Complete)");
@@ -351,7 +346,7 @@ public class LineBotHandler {
     }
 
     // =========================================================================
-    // 🔹 Image Message Handler (แก้ไข: แจ้งเตือนแอดมินแค่ 1 ครั้ง ต่อ 1 นาที)
+    // 🔹 Image Message Handler (ฉบับแก้ไข: สร้างเกราะป้องกันส่งรูปผิดจังหวะ)
     // =========================================================================
     private void handleImageMessage(BotUser botUser, List<Map<String, String>> currentHistory,
                                     String replyToken, String userId) throws Exception {
@@ -363,41 +358,42 @@ public class LineBotHandler {
         botUserRepository.save(botUser);
 
         // ==================================================================
-        // 🛑 LOGIC กัน Spam ตอบกลับลูกค้า (User Reply Cooldown) 🛑
+        // 🛑 [หัวใจสำคัญ] เกราะป้องกันรูปภาพ (Strict Image Shield)
+        // ถ้าสถานะไม่ใช่การรอรูป ให้บล็อคทันที! ไม่ต้องแจ้งเตือนแอดมิน
+        // ==================================================================
+        if (STATUS_NORMAL.equals(currentStatus) ||
+                STATUS_WAIT_CREDIT.equals(currentStatus) ||
+                STATUS_WAIT_BACKUP.equals(currentStatus)) {
+
+            // เตือนให้ลูกค้าพิมพ์ข้อความแทน
+            reply(replyToken, "ตอนนี้แอดมินรอข้อมูลเป็น **ข้อความ** อยู่นะครับผม รบกวนลูกค้าพิมพ์ตอบกลับมาได้เลยครับ ✍️ (ยังไม่ต้องส่งรูปน้า)");
+            return; // ⛔ จบการทำงานตรงนี้เลย! ป้องกันไม่ให้ไปเรียกปุ่มแอดมิน
+        }
+
+        // ==================================================================
+        // ✅ ถ้าผ่านมาถึงตรงนี้ได้ แปลว่าอยู่ในสถานะที่ "ส่งรูปได้" (WAIT_IMAGE, WAIT_DOCS, WAIT_SIGNOUT)
         // ==================================================================
 
-        // 1. ดึงเวลาที่ตอบลูกค้าล่าสุด
-        LocalDateTime lastReply = userReplyCooldownMap.get(userId);
+        // --- 1. Logic กัน Spam ตอบกลับลูกค้า (User Reply Cooldown) ---
         LocalDateTime now = LocalDateTime.now();
-
-        // 2. เช็คว่าควรตอบไหม? (ถ้าไม่เคยตอบ หรือ ตอบไปนานเกิน 3 วินาทีแล้ว ให้ตอบใหม่)
-        boolean shouldReplyUser = (lastReply == null) ||
-                java.time.Duration.between(lastReply, now).toSeconds() > 3;
+        LocalDateTime lastReply = userReplyCooldownMap.get(userId);
+        boolean shouldReplyUser = (lastReply == null) || java.time.Duration.between(lastReply, now).toSeconds() > 3;
 
         if (shouldReplyUser) {
-            // อัปเดตเวลาตอบล่าสุดทันที
             userReplyCooldownMap.put(userId, now);
 
-            // เลือกข้อความตอบกลับตามสถานะ
             if (STATUS_WAIT_DOCS.equals(currentStatus)) {
                 reply(replyToken, "ได้รับเอกสารแล้วครับ 📄 (ถ้าครบแล้วพิมพ์ 'ครบแล้ว' ได้เลยครับ)");
             } else if (STATUS_WAIT_SIGNOUT.equals(currentStatus)) {
                 reply(replyToken, "ได้รับรูป Sign Out แล้วครับ รบกวนรอตรวจสอบสักครู่นะครับ ☁️⏳");
-            } else {
+            } else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
                 reply(replyToken, "ได้รับรูปภาพแล้วครับผม รอเเอดมินตรวจสอบซักครู่นะครับ! 👍");
             }
-        } else {
-            // 🤫 เงียบกริบ (ไม่ต้องตอบซ้ำ เพราะถือว่าเป็นรูปล็อตเดียวกัน)
-            log.info("Skipped reply to user {} (Spam protection active)", userId);
         }
 
-        // ==================================================================
-
-        // --- Logic: แจ้งเตือน Admin (อันเดิมของคุณ ไม่ต้องแก้) ---
-        // (ส่วนนี้ทำงานแยกกัน คือแม้จะไม่ตอบลูกค้า แต่ถ้าถึงเวลาเตือนแอดมิน ก็ยังเตือนปกติ)
+        // --- 2. Logic แจ้งเตือนแอดมิน (Cooldown 60 วินาที) ---
         LocalDateTime lastNotify = notifyCooldownMap.get(userId);
-        boolean shouldNotifyAdmin = (lastNotify == null) ||
-                java.time.Duration.between(lastNotify, now).toSeconds() > 60;
+        boolean shouldNotifyAdmin = (lastNotify == null) || java.time.Duration.between(lastNotify, now).toSeconds() > 60;
 
         if (shouldNotifyAdmin) {
             notifyCooldownMap.put(userId, now);
@@ -407,10 +403,10 @@ public class LineBotHandler {
             } else if (STATUS_WAIT_SIGNOUT.equals(currentStatus)) {
                 activateHumanMode(botUser, "☁️ ลูกค้าส่งภาพ Sign Out iCloud เข้ามาครับ");
             } else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
-                activateHumanMode(botUser, "📸 ลูกค้าส่งรูปภาพเข้ามา (เช็คสภาพเครื่อง)");
-            } else {
-                activateHumanMode(botUser, "📸 ลูกค้าส่งรูปภาพ (ไม่ได้อยู่ในสถานะรอรูป)");
+                activateHumanMode(botUser, "📸 ลูกค้าส่งรูปรอบเครื่องเข้ามา (รอเช็คสภาพ)");
             }
+            // ❌ สังเกตว่าผม "ลบเงื่อนไข else" ที่ยิงปุ่ม "🆘 เรียกแอดมิน" ทิ้งไปแล้ว
+            // เพราะถ้าลูกค้าส่งรูปผิดจังหวะ มันจะถูกบล็อคตั้งแต่ "เกราะป้องกัน" ด้านบนสุดแล้วครับ
         }
     }
 
