@@ -96,41 +96,42 @@ public class LineBotHandler {
             String userId = event.source().userId();
             String replyToken = event.replyToken();
 
-            // ------------------------------------------------------------------
-            // 🔐 Admin Remote Control
-            // ------------------------------------------------------------------
             if (isAdminCommand(event, userId, replyToken)) {
-                return; // จัดการเสร็จแล้ว
+                return;
             }
 
-            // ------------------------------------------------------------------
-            // 👤 Load or Create User
-            // ------------------------------------------------------------------
             BotUser botUser = loadOrCreateUser(userId);
             List<Map<String, String>> currentHistory = parseHistory(botUser.getChatHistoryJson());
 
             // ------------------------------------------------------------------
-            // 🛑 [หัวใจสำคัญ] กำแพงเหล็ก ปิดปาก AI 100% ระหว่างแอดมินคุย
+            // 🛑 กำแพงเหล็ก ปิดปาก AI 100% ระหว่างแอดมินคุย
             // ------------------------------------------------------------------
             if (botUser.isHumanMode()) {
                 if (event.message() instanceof TextMessageContent textContent) {
                     String text = textContent.text().trim();
-                    // ยอมให้ผ่านเฉพาะคำสั่งปลุก AI เท่านั้น นอกนั้นตัดบททิ้งหมด
-                    if (!text.equalsIgnoreCase("#reset") && !text.equalsIgnoreCase("bot_start")) {
-                        return; // 🤫 แอดมินคุยอยู่ -> บอทเงียบ 100% ไม่ยุ่งเลย
+                    // 🌟 [แก้ Use Case 3] เพิ่ม #ทำต่อ ลงไปให้ทะลุกำแพงได้
+                    if (!text.equalsIgnoreCase("#reset") &&
+                            !text.equalsIgnoreCase("bot_start") &&
+                            !text.equalsIgnoreCase("#ทำต่อ")) {
+                        return; // แอดมินคุยอยู่ -> บอทเงียบ
                     }
                 } else {
-                    return; // 🤫 ลูกค้าส่งรูปภาพ ส่งสติ๊กเกอร์ หรืออื่นๆ -> บอทก็เงียบ 100%
+                    return; // ลูกค้าส่งรูป/วิดีโอตอนแอดมินคุย -> บอทเงียบ
                 }
             }
 
-
+            // ------------------------------------------------------------------
+            // แยกประเภทข้อความ (Text / Image / Other)
+            // ------------------------------------------------------------------
             if (event.message() instanceof TextMessageContent textContent) {
                 handleTextMessage(textContent, botUser, currentHistory, replyToken, userId);
             }
-
             else if (event.message() instanceof ImageMessageContent) {
                 handleImageMessage(botUser, currentHistory, replyToken, userId);
+            }
+            // 🌟 [แก้ Use Case 1] ลูกค้าส่ง วิดีโอ / สติ๊กเกอร์ / โลเคชั่น
+            else {
+                reply(replyToken, "ขออภัยครับ 🙏 ตอนนี้น้องดีดี (AI) สามารถรับข้อมูลได้เฉพาะ **ข้อความ** และ **รูปภาพ** เท่านั้นครับผม รบกวนลูกค้าส่งข้อมูลใหม่อีกครั้งนะครับ 😅");
             }
 
         } catch (Exception e) {
@@ -170,12 +171,30 @@ public class LineBotHandler {
             botUser.setHumanMode(false);
             botUser.setChatHistoryJson("[]");
             botUser.setCurrentStatus(STATUS_NORMAL);
-            botUser.setHandlerAdminId(null); // ✅ ล้างชื่อแอดมินที่รับงาน
-
-
-
+            botUser.setHandlerAdminId(null);
             botUserRepository.save(botUser);
             reply(replyToken, "🤖 น้องดีดี (AI) กลับมาประจำการแล้วครับ! (Reset Complete)");
+            return;
+        }
+
+        // 🌟 [เพิ่มใหม่] คำสั่ง #ทำต่อ
+        if (userText.equalsIgnoreCase("#ทำต่อ") || userText.equalsIgnoreCase("bot_continue")) {
+            botUser.setHumanMode(false);
+            botUserRepository.save(botUser);
+            reply(replyToken, "🤖 ระบบบอทกลับมาทำงานต่อแล้วครับ! รบกวนดำเนินการขั้นตอนล่าสุดต่อได้เลยครับผม");
+            return;
+        }
+
+        // 🌟 [แก้ Use Case 2] ดักคำขอความช่วยเหลือฉุกเฉิน (ทะลุกำแพงทุกอย่าง)
+        if (userText.contains("แอดมิน") || userText.contains("ติดต่อคน") || userText.contains("ทำไม่เป็น") || userText.contains("งง")) {
+            if (!botUser.isHumanMode()) {
+                botUser.setHumanMode(true);
+                botUser.setCurrentStatus("WAIT_ADMIN");
+                botUserRepository.save(botUser);
+
+                reply(replyToken, "รับทราบครับ 🙏 ระบบได้เรียกแอดมินให้แล้ว รบกวนรอแอดมินเข้ามาให้คำแนะนำสักครู่นะครับ ⏳");
+                notifyAdminDirectly(botUser, "🚨 ลูกค้าต้องการความช่วยเหลือ/ทำไม่เป็น (บอทหยุดชั่วคราว)");
+            }
             return;
         }
 
