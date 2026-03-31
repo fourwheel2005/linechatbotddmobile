@@ -59,7 +59,6 @@ public class LineBotHandler {
     private static final String STATUS_WAIT_IMAGE = "WAIT_IMAGE";
     private static final String STATUS_WAIT_CREDIT = "WAIT_CREDIT";
     private static final String STATUS_WAIT_DOCS = "WAIT_DOCS";
-    private static final String STATUS_WAIT_SIGNOUT = "WAIT_SIGNOUT";
     private static final String STATUS_WAIT_BACKUP = "WAIT_BACKUP";
 
 
@@ -289,16 +288,7 @@ public class LineBotHandler {
             replyMultiple(replyToken, messages);
         }
 
-        // 🟢 กรณี C: AI สั่งให้โชว์กฎเหล็ก 15 วัน (Step 5B - ราย 15 วัน) 🔥 เพิ่มใหม่ตรงนี้
-        else if (aiResponse.contains("[SHOW_15DAY_RULES]")) {
-            // URL รูปภาพสำหรับ 15 วัน (เงื่อนไข, กฎเหล็ก, เอกสาร)
-            List<String> imageUrls = Arrays.asList(
-                    "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8519737.jpg", // เงื่อนไขรีไฟแนนซ์
-                    "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8519739.jpg", // กฎเหล็ก 4 ข้อ
-                    "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8519734.jpg"  // เอกสารที่ต้องใช้
-            );
-            sendCarouselMessage(replyToken, cleanResponse, "เงื่อนไขและกฎเหล็ก (15 วัน)", imageUrls);
-        }
+
 
         // 🟠 [เพิ่มใหม่] กรณี E: AI สั่งให้ขอเอกสารรายเดือน (Step 6A) ส่งข้อความพร้อมรูปภาพ
         else if (aiResponse.contains("[SHOW_DOCS_MONTHLY]")) {
@@ -403,9 +393,8 @@ public class LineBotHandler {
 
             if (STATUS_WAIT_DOCS.equals(currentStatus)) {
                 reply(replyToken, "ได้รับเอกสารแล้วครับ 📄 (ถ้าครบแล้วพิมพ์ 'ครบแล้ว' ได้เลยครับ)");
-            } else if (STATUS_WAIT_SIGNOUT.equals(currentStatus)) {
-                reply(replyToken, "ได้รับรูป Sign Out แล้วครับ รบกวนรอตรวจสอบสักครู่นะครับ ☁️⏳");
-            } else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
+            }
+            else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
                 reply(replyToken, "ได้รับรูปภาพแล้วครับผม รอเเอดมินตรวจสอบซักครู่นะครับ! 👍");
             }
         }
@@ -419,9 +408,8 @@ public class LineBotHandler {
 
             if (STATUS_WAIT_DOCS.equals(currentStatus)) {
                 notifyAdminDirectly(botUser, "📄 ลูกค้าทยอยส่งเอกสารเข้ามาครับ");
-            } else if (STATUS_WAIT_SIGNOUT.equals(currentStatus)) {
-                activateHumanMode(botUser, "☁️ ลูกค้าส่งภาพ Sign Out iCloud เข้ามาครับ");
-            } else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
+            }
+            else if (STATUS_WAIT_IMAGE.equals(currentStatus)) {
                 activateHumanMode(botUser, "📸 ลูกค้าส่งรูปรอบเครื่องเข้ามา (รอเช็คสภาพ)");
             }
             // ❌ สังเกตว่าผม "ลบเงื่อนไข else" ที่ยิงปุ่ม "🆘 เรียกแอดมิน" ทิ้งไปแล้ว
@@ -593,14 +581,7 @@ public class LineBotHandler {
                     isApproved ? "ดำเนินการต่อ Step 3 (ขอชื่อ-นามสกุล)" : "แจ้งว่าสภาพเครื่องไม่ผ่าน"
             );
         }
-        // --- [เพิ่ม Case นี้เข้าไป] ---
-        else if (STATUS_WAIT_SIGNOUT.equals(previousStatus)) {
-            signal = String.format(
-                    "แอดมินตรวจสอบรูปภาพแล้ว กดปุ่ม%s (ยืนยันว่าลูกค้า Sign Out เรียบร้อย)\nคำสั่ง: %s",
-                    approvalText,
-                    isApproved ? "ดำเนินการต่อ Step 6B (ขอเอกสารสำหรับ Flow 15 วัน)" : "แจ้งลูกค้าว่ารูป Sign Out ยังไม่ถูกต้อง ให้ลองใหม่"
-            );
-        }
+
 
         // 🟢 4. เพิ่มคำสั่งบังคับ AI ตรงนี้
         else if (STATUS_WAIT_BACKUP.equals(previousStatus)) {
@@ -770,14 +751,7 @@ public class LineBotHandler {
             log.info("Status changed to WAIT_DOCS for user {}", botUser.getUserId());
         }
 
-        // --- 3. เช็คกลุ่ม WAIT_SIGNOUT (ขั้นตอน Step 5B) ---
-        else if (aiResponse.contains("Sign Out") ||
-                aiResponse.contains("ลงชื่อออก") ||
-                aiResponse.contains("หลักฐานการลบ")) {
 
-            botUser.setCurrentStatus(STATUS_WAIT_SIGNOUT);
-            log.info("Status changed to WAIT_SIGNOUT for user {}", botUser.getUserId());
-        }
 
         // --- 4. เช็คกลุ่ม WAIT_IMAGE (เช็คสภาพทั่วไป / Step 2) ---
         else if (aiResponse.contains("ถ่ายรูปรอบเครื่อง") ||
@@ -907,13 +881,7 @@ public class LineBotHandler {
                 btnApproveLabel = "✅ เครดิตผ่าน";
                 btnRejectLabel = "❌ ไม่ผ่าน/ติดBL";
             }
-            // --- [เพิ่ม Case นี้เข้าไป] ---
-            case STATUS_WAIT_SIGNOUT -> {
-                title = "☁️ เช็ค Sign Out"; // หัวข้อปุ่ม
-                detailText = "ลูกค้าส่งภาพ Sign Out iCloud\nสาเหตุ: " + reason;
-                btnApproveLabel = "✅ Sign Out แล้ว"; // ปุ่มอนุมัติ
-                btnRejectLabel = "❌ ยังไม่ผ่าน/มีเมล"; // ปุ่มปฏิเสธ
-            }
+
             case STATUS_WAIT_BACKUP -> {
                 title = "💾 ช่วยลูกค้า Step 5A";
                 detailText = "ลูกค้าติดปัญหาล้างเครื่อง/Backup\nสาเหตุ: " + reason;
@@ -947,7 +915,7 @@ public class LineBotHandler {
                 Arrays.asList(approveAction, rejectAction)
         );
 
-        TemplateMessage templateMessage = new TemplateMessage("🔔 งานเข้า: " + title, buttonsTemplate);
+        TemplateMessage templateMessage = new TemplateMessage("🔔 เงินเข้า: " + title, buttonsTemplate);
         TextMessage backupText = new TextMessage("🆔 UserID: " + botUser.getUserId() + "\n👤 ลูกค้า: " + displayName);
 
         return Arrays.asList(templateMessage, backupText);
