@@ -21,8 +21,10 @@ line:
   admin:
     user-ids: ${LINE_ADMIN_USER_IDS}
 
-openai:
-  api:
-    key: ${OPENAI_API_KEY}
-    url: "https://api.openai.com/v1"
-  model: "gpt-4o-mini"
+ai:
+  openai:
+    api-key: ${OPENAI_API_KEY} # แนะนำให้อ่านจาก Environment Variable เพื่อความปลอดภัย
+    chat:
+      options:
+        model: "gpt-4o-mini" # หรือรุ่นอื่นที่ต้องการใช้ เช่น gpt-4o-mini
+        temperature: 0.2

@@ -1,0 +1,117 @@
+{
+  "type": "bubble",
+  "size": "mega",
+  "header": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "🚨 ฉุกเฉิน: ลูกค้าต้องการคุยกับคน",
+        "weight": "bold",
+        "color": "#FFFFFF",
+        "size": "md"
+      }
+    ],
+    "backgroundColor": "#9C27B0",
+    "paddingAll": "12px"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "บริการ: {{SERVICE_NAME}}",
+        "weight": "bold",
+        "size": "xl",
+        "margin": "md"
+      },
+      {
+        "type": "box",
+        "layout": "vertical",
+        "margin": "lg",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "ลูกค้า",
+                "color": "#aaaaaa",
+                "size": "sm",
+                "flex": 1
+              },
+              {
+                "type": "text",
+                "text": "{{USER_ID}}",
+                "wrap": true,
+                "color": "#666666",
+                "size": "sm",
+                "flex": 3,
+                "weight": "bold"
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "layout": "baseline",
+            "spacing": "sm",
+            "contents": [
+              {
+                "type": "text",
+                "text": "สาเหตุ",
+                "color": "#aaaaaa",
+                "size": "sm",
+                "flex": 1
+              },
+              {
+                "type": "text",
+                "text": "{{EXTRA_INFO}}",
+                "wrap": true,
+                "color": "#FF4B4B",
+                "size": "sm",
+                "flex": 3,
+                "weight": "bold"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "horizontal",
+    "spacing": "sm",
+    "contents": [
+      {
+        "type": "button",
+        "style": "primary",
+        "height": "sm",
+        "action": {
+          "type": "postback",
+          "label": "💬 แอดมินรับเรื่อง",
+          "data": "action=take_case&service={{SERVICE_EN}}&userId={{USER_ID}}",
+          "displayText": "แอดมินเข้าดูแลเคสนี้แล้ว"
+        },
+        "color": "#17A2B8"
+      },
+      {
+        "type": "button",
+        "style": "secondary",
+        "height": "sm",
+        "action": {
+          "type": "postback",
+          "label": "▶️ คืนร่างบอท",
+          "data": "action=resume_bot&service={{SERVICE_EN}}&userId={{USER_ID}}",
+          "displayText": "แอดมินกด: เปิดบอทให้เคสนี้ทำงานต่อ"
+        },
+        "color": "#00B900"
+      }
+    ]
+  }
+}
