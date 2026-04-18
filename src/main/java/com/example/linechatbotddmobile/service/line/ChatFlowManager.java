@@ -1,6 +1,7 @@
 package com.example.linechatbotddmobile.service.line;
 
 import com.example.linechatbotddmobile.entity.UserState;
+import com.example.linechatbotddmobile.repository.ChatHistoryRepository;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
 import com.example.linechatbotddmobile.service.ai.AiChatService; // 🌟 นำเข้า AiChatService
 import com.example.linechatbotddmobile.service.flow.ServiceFlowHandler;
@@ -18,6 +19,7 @@ public class ChatFlowManager {
     private final UserStateRepository userStateRepository;
     private final List<ServiceFlowHandler> flowHandlers;
     private final AiChatService aiChatService; // 🌟 ฉีด AiChatService เข้ามา
+    private final ChatHistoryRepository chatHistoryRepository;
 
     public String handleTextMessage(String lineUserId, String userMessage) {
 
@@ -27,12 +29,20 @@ public class ChatFlowManager {
             return newUser;
         });
 
-        String msg = userMessage.trim().toLowerCase();
+        String msg = userMessage.trim();
+        String msgLower = msg.toLowerCase();
+
+        // ✅ เริ่มใหม่ — ล้างข้อมูลทั้งหมดของลูกค้าคนนี้
+        if (msgLower.equals("เริ่มใหม่")) {
+            chatHistoryRepository.deleteByLineUserId(lineUserId);
+            userStateRepository.delete(userState);
+            log.info("🗑️ ล้างข้อมูลลูกค้า {} เรียบร้อยแล้ว", lineUserId);
+            return "ล้างข้อมูลเรียบร้อยแล้วครับ 🔄 ลูกค้าสามารถเริ่มต้นใหม่ได้เลยครับ 😊";
+        }
 
         if ("ADMIN_MODE".equals(userState.getCurrentState())) return null;
 
-        // ถ้าลูกค้าพิมพ์คำสั่งเป๊ะๆ เข้า Flow รีบอลลูน
-        if (msg.equals("รีบอลลูน") || msg.equals("ผ่อนบอลลูน")) {
+        if (msgLower.equals("รีบอลลูน") || msgLower.equals("ผ่อนบอลลูน")) {
             userState.setCurrentState("STEP_1_INFO");
             userState.setServiceName("รีบอลลูน");
             userStateRepository.save(userState);
@@ -40,7 +50,6 @@ public class ChatFlowManager {
 
         String currentService = userState.getServiceName();
 
-        // 🌟 ถ้ากำลังอยู่ใน Flow บริการ (เช่น รีบอลลูน) ให้ Flow จัดการ
         if (currentService != null && !currentService.isEmpty()) {
             for (ServiceFlowHandler handler : flowHandlers) {
                 if (handler.supports(currentService)) {
@@ -49,9 +58,6 @@ public class ChatFlowManager {
             }
         }
 
-        // ========================================================
-        // 🌟 ถ้าไม่ได้อยู่ในบริการไหนเลย (ถามทั่วไป) -> โยนให้ AiChatService ตอบ
-        // ========================================================
         log.info("🤖 ลูกค้าถามทั่วไป โยนให้ AI Chat Service ตอบ");
         return aiChatService.generateResponse(lineUserId, userMessage);
     }
