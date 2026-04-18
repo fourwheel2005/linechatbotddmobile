@@ -11,18 +11,19 @@ spring:
       hibernate:
         format_sql: true
 
+  # ✅ ย้าย ai มาอยู่ใต้ spring แบบนี้ครับ
+  ai:
+    openai:
+      # ลองใส่ค่า default ไว้กันเหนียวแบบนี้ก่อนก็ได้ครับ
+      api-key: ${OPENAI_API_KEY:sk-proj-ใส่คีย์ของคุณตรงนี้}
+      chat:
+        options:
+          model: "gpt-4o-mini"
+          temperature: 0.1
+
 line:
   bot:
     channel-token: ${LINE_BOT_CHANNEL_TOKEN}
     channel-secret: ${LINE_BOT_CHANNEL_SECRET}
     handler:
       path: /callback
-
-
-ai:
-  openai:
-    api-key: ${OPENAI_API_KEY} # แนะนำให้อ่านจาก Environment Variable เพื่อความปลอดภัย
-    chat:
-      options:
-        model: "gpt-4o-mini" # หรือรุ่นอื่นที่ต้องการใช้ เช่น gpt-4o-mini
-        temperature: 0.1
