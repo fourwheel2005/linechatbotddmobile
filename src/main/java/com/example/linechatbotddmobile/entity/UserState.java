@@ -1,11 +1,17 @@
 package com.example.linechatbotddmobile.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Data
 @Entity
 @Table(name = "user_states")
+@Data // สร้าง Getter/Setter ให้อัตโนมัติด้วย Lombok
+@NoArgsConstructor // สร้าง Default Constructor
+@AllArgsConstructor // สร้าง Constructor แบบรับค่าทุกฟิลด์
+@Builder // ช่วยให้สร้าง Object ง่ายขึ้น
 public class UserState {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
