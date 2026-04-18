@@ -33,7 +33,7 @@ public class LineWebhookController {
     private final ConcurrentHashMap<String, Instant> lastImageReceivedTime = new ConcurrentHashMap<>();
 
     // ID ของกลุ่มแอดมิน (เปลี่ยนเป็นของคุณ)
-    private final String MAIN_ADMIN_GROUP_ID = "";
+    private final String MAIN_ADMIN_GROUP_ID = "Ced29a5fec5e581b47ffa61d9845e71bf";
 
     // ==========================================
     // ✉️ & 📸 รับ Event ข้อความและรูปภาพ

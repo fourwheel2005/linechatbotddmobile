@@ -23,7 +23,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private final AiDataExtractorService aiDataExtractorService;
     private final AiScreeningService aiScreeningService;
 
-    private final String ADMIN_GROUP_ID = "C75eb19ed18cf5a67a1461f785f581e78";
+    private final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
 
     public record BalloonPrice(int buyPrice, int m6, int m8, int m10, int m12) {}
 
