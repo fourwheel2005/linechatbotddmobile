@@ -18,8 +18,6 @@ line:
     handler:
       path: /callback
 
-  admin:
-    user-ids: ${LINE_ADMIN_USER_IDS}
 
 ai:
   openai:
@@ -27,4 +25,4 @@ ai:
     chat:
       options:
         model: "gpt-4o-mini" # หรือรุ่นอื่นที่ต้องการใช้ เช่น gpt-4o-mini
-        temperature: 0.2
+        temperature: 0.1
