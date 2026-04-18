@@ -8,6 +8,7 @@ import com.example.linechatbotddmobile.service.flow.ServiceFlowHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,7 +22,12 @@ public class ChatFlowManager {
     private final AiChatService aiChatService; // 🌟 ฉีด AiChatService เข้ามา
     private final ChatHistoryRepository chatHistoryRepository;
 
+
+    @Transactional
     public String handleTextMessage(String lineUserId, String userMessage) {
+        if (userMessage == null || userMessage.trim().isEmpty()) {
+            return null;
+        }
 
         UserState userState = userStateRepository.findByLineUserId(lineUserId).orElseGet(() -> {
             UserState newUser = new UserState();
