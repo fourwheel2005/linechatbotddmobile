@@ -26,31 +26,34 @@ public class AiDataExtractorService {
      */
     public ExtractedData extractInfo(String currentMessage, String lastMessage) {
         try {
-            // 🧠 ดึงความจำเดิมมาเชื่อมกับข้อความใหม่
             String context = (lastMessage != null && !lastMessage.trim().isEmpty()) ? lastMessage : "ไม่มี";
             String combinedMessage = "ข้อความก่อนหน้า: " + context + " | ข้อความล่าสุด: " + currentMessage;
 
             log.info("🔍 [Extractor] ให้ AI สกัดข้อมูลจาก: {}", combinedMessage);
 
-            // 🌟 ให้ Spring AI จัดการส่ง Prompt และแปลงผลลัพธ์ (JSON) กลับมาเป็น Object ให้เลย
             ExtractedData result = chatClient.prompt()
                     .system(sys -> sys.text(extractorPromptTemplate))
                     .user(u -> u.text(combinedMessage))
                     .call()
                     .entity(ExtractedData.class);
 
-            log.info("✅ [Extractor] สกัดสำเร็จ: Model={}, Age={}", result.deviceModel(), result.age());
+            // ✅ เพิ่ม capacity ใน log
+            log.info("✅ [Extractor] สกัดสำเร็จ: Model={}, Capacity={}, Age={}",
+                    result.deviceModel(), result.capacity(), result.age());
 
-            // 🛡️ ดักจับ Null เพื่อไม่ให้ Flow พัง
+            // ✅ เพิ่ม capacity ใน constructor (จุดที่ 1)
+            // ✅ จุดที่ 1 — สลับให้ตรง record (deviceModel, age, capacity)
             return new ExtractedData(
                     result.deviceModel() != null && !result.deviceModel().isEmpty() ? result.deviceModel() : "unknown",
-                    result.age() != null ? result.age() : 0
+                    result.age() != null ? result.age() : 0,
+                    result.capacity() != null && !result.capacity().isEmpty() ? result.capacity() : "unknown"
             );
 
+// ✅ จุดที่ 2 — fallback ลำดับเดียวกัน
         } catch (Exception e) {
             log.error("❌ [Extractor] ทำงานล้มเหลว: ", e);
-            // คืนค่า Default กลับไปให้ Flow ถามลูกค้าใหม่
-            return new ExtractedData("unknown", 0);
+            // ✅ เพิ่ม capacity ใน fallback (จุดที่ 2)
+            return new ExtractedData("unknown", 0, "unknown");
         }
     }
 }
