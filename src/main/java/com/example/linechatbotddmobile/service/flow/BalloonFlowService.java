@@ -209,18 +209,24 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_9_SETTINGS_PHOTO": // รับรูปรอบเครื่อง → ขอรูปหน้าตั้งค่า (พร้อมตัวอย่าง)
                 // ══════════════════════════════════════════════════════════
-                // 🛡️ ดักรอรูป Batch หรือคำว่าครบแล้ว
-                boolean isImageBatchReceived = msg.equals("[รูปภาพ]") ||
-                        msg.contains("ครบ") ||
+
+                // 1. ถ้าสิ่งที่ส่งมาคือรูปภาพ (จาก Webhook 3 วินาที) ให้ตอบกลับให้พิมพ์ยืนยัน
+                if (msg.equals("[รูปภาพ]")) {
+                    return "น้องทันใจได้รับรูปแล้วครับ 📸 ทยอยส่งมาให้ครบ 4-5 รูปได้เลยนะครับ\n" +
+                            "(หากส่งครบแล้ว รบกวนพิมพ์บอกแอดมินว่า **'ครบแล้ว'** ด้วยนะครับ ✨)";
+                }
+
+                // 2. ตรวจสอบว่าลูกค้าพิมพ์คำว่าครบหรือยัง
+                boolean isImageBatchReceived = msg.contains("ครบ") ||
                         msg.contains("ส่งแล้ว") ||
                         msg.contains("เรียบร้อย");
 
                 if (!isImageBatchReceived) {
                     return "น้องทันใจกำลังรอรูปรอบเครื่องอยู่นะครับ 📸 ทยอยส่งมาได้เลยครับ\n" +
-                            "(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า 'ครบแล้ว' ได้เลยครับ ✨)";
+                            "(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)";
                 }
 
-                // ✅ ส่งไป STEP_10_NAME เพื่อรอรับรูปแคปหน้าจอตั้งค่า
+                // ✅ 3. ถ้ารับคำว่า 'ครบแล้ว' จริงๆ -> ให้ไปต่อ
                 userState.setCurrentState("STEP_10_NAME");
                 String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
                 lineMessageService.sendImage(userId, exampleImageUrl);
