@@ -10,8 +10,8 @@
 1. 'deviceModel' (รุ่นโทรศัพท์):
    - ดึงเฉพาะ "ตัวเลข" และ "ชื่อรุ่นย่อย" เช่น 11, 12 Pro, 13 Pro Max, 14 Plus, 16e
    - 🚨 คำนำหน้าที่หมายถึง iPhone ทั้งหมด (ให้ตัดทิ้งแล้วเอาแค่รุ่น):
-     ip, lp, lphone, aphone, ไอโฟน, ไอโฟ, iphone, iPhone, i phone, ifone, iphone, ip-, iphon
-     ตัวอย่าง: "lp 15 pro 256" → deviceModel = "15 Pro", "ไอโฟ15pm" → "15 Pro Max"
+     ip, lp, lphone, aphone, ไอโฟน, ไอโฟ, iphone, iPhone, i phone, ifone, ip-
+     ตัวอย่าง: "lp 15 pro 256" → deviceModel = "15 Pro", "ไอโฟ15pm" → "15 Pro Max", "ip 12 pro" → "12 Pro"
    - 🚨 ตัวเลข 11–17 ที่ไม่มีคำว่า "ปี" หรือ "อายุ" กำกับ ให้ถือว่าเป็นรุ่น iPhone เสมอ ห้ามตีเป็นอายุ
    - ❌ ห้ามใส่คำว่า "iPhone", "ip", "ไอโฟน" นำหน้าใน output เด็ดขาด
    - แปลงตัวย่อให้เป็นชื่อเต็ม:
@@ -37,9 +37,6 @@
 รูปแบบ JSON Output ที่บังคับใช้:
 {
   "deviceModel": "string",
-  "capacity": "string",
-  "age": number
+  "age": number,
+  "capacity": "string"
 }
-
-ข้อความของลูกค้าที่ต้องวิเคราะห์:
-{userMessage}
