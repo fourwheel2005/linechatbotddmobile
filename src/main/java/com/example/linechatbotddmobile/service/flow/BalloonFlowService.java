@@ -40,16 +40,13 @@ public class BalloonFlowService implements ServiceFlowHandler {
         String state = userState.getCurrentState() != null ? userState.getCurrentState() : "STEP_1_INFO";
         String msg = userMessage.trim();
         String userId = userState.getLineUserId();
-
-        // 🧠 ดึงความจำ (ข้อความก่อนหน้า) มาใช้
         String lastMessage = userState.getLastUserMessage();
 
-        // 🚨 Panic Mode: ต้องการคุยกับคน
         boolean isPanic = msg.matches(".*(แอดมิน|คุยกับคน|อ่านดีๆ|บอกไปแล้ว|บอท|ไม่รู้เรื่อง|อะไรเนี่ย).*");
         if (isPanic) {
             userState.setPreviousState(state);
             userState.setCurrentState("ADMIN_MODE");
-            userState.setLastUserMessage(msg); // อัปเดตความจำ
+            userState.setLastUserMessage(msg);
             userStateRepository.save(userState);
             lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), getCustomerName(userId), "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
             return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินตัวจริงรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
@@ -58,32 +55,61 @@ public class BalloonFlowService implements ServiceFlowHandler {
         String responseMessage = null;
 
         switch (state) {
-            case "STEP_1_INFO":
-                userState.setCurrentState("STEP_2_PROVINCE");
+
+            // ══════════════════════════════════════════════════════════
+            case "STEP_1_INFO": // เริ่มต้น → ถามรุ่น
+                // ══════════════════════════════════════════════════════════
+                userState.setCurrentState("STEP_2_CAPACITY");
                 responseMessage = "สวัสดีครับ 🙏😊 น้องทันใจยินดีให้บริการรีบอลลูนครับ ขออนุญาตสอบถามข้อมูลเบื้องต้นนะครับ\n" +
-                        "👉 ลูกค้าใช้ไอโฟนรุ่นไหน ความจุกี่ GB ครับ?";
+                        "👉 ลูกค้าใช้ไอโฟน **รุ่นไหน** ครับ? (เช่น 13 Pro Max, 15 Pro, 16)";
                 break;
 
-            case "STEP_2_PROVINCE":
-                log.info("🤖 [รีบอลลูน] STEP_2 AI สกัดรุ่นจาก: {}", msg); // เพิ่มบรรทัดนี้
+            // ══════════════════════════════════════════════════════════
+            case "STEP_2_CAPACITY": // รับรุ่น → ถามความจุ
+                // ══════════════════════════════════════════════════════════
+                log.info("🤖 [รีบอลลูน] STEP_2 AI สกัดรุ่นจาก: {}", msg);
                 ExtractedData modelData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 String extractedModel = modelData.deviceModel();
 
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
-                    responseMessage = "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 อีกครั้งนะครับ 📱";
+                    responseMessage = "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱";
                     break;
                 }
+
                 userState.setDeviceModel(extractedModel);
-                userState.setCurrentState("STEP_3_AGE");
-                responseMessage = "รับทราบครับ รุ่น **iPhone " + extractedModel + "** นะครับ!\n👉 ลูกค้าอยู่จังหวัดอะไรครับ?";
+                userState.setCurrentState("STEP_3_PROVINCE");
+                responseMessage = "รับทราบครับ รุ่น **iPhone " + extractedModel + "** นะครับ! 📱\n" +
+                        "👉 สนใจความจุ **กี่ GB** ดีครับ? (เช่น 128, 256, 512)";
                 break;
 
-            case "STEP_3_AGE":
-                userState.setCurrentState("STEP_4_REPAIR");
-                responseMessage = "โอเคครับ 📍 แล้วลูกค้าอายุเท่าไหร่ครับ?";
+            // ══════════════════════════════════════════════════════════
+            case "STEP_3_PROVINCE": // รับความจุ → ถามจังหวัด
+                // ══════════════════════════════════════════════════════════
+                log.info("🤖 [รีบอลลูน] STEP_3 AI สกัดความจุจาก: {}", msg);
+                ExtractedData capData = aiDataExtractorService.extractInfo(msg, lastMessage);
+                String extractedCapacity = capData.capacity();
+
+                if (extractedCapacity == null || "unknown".equalsIgnoreCase(extractedCapacity)) {
+                    responseMessage = "รบกวนระบุความจุอีกครั้งนะครับ 🙏 เช่น 128GB, 256GB ครับ";
+                    break;
+                }
+
+                userState.setCapacity(extractedCapacity);
+                userState.setCurrentState("STEP_4_AGE");
+                responseMessage = "ความจุ **" + extractedCapacity + "** นะครับ! ✨\n" +
+                        "👉 ลูกค้าอยู่ **จังหวัด** อะไรครับ?";
                 break;
 
-            case "STEP_4_REPAIR":
+            // ══════════════════════════════════════════════════════════
+            case "STEP_4_AGE": // รับจังหวัด → ถามอายุ
+                // ══════════════════════════════════════════════════════════
+                userState.setCurrentState("STEP_5_REPAIR");
+                responseMessage = "โอเคครับ 📍 แล้วลูกค้า **อายุ** เท่าไหร่ครับ?";
+                break;
+
+            // ══════════════════════════════════════════════════════════
+            case "STEP_5_REPAIR": // รับอายุ → เช็คเกณฑ์ → ถามซ่อม
+                // ══════════════════════════════════════════════════════════
                 ExtractedData ageData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 Integer extractedAge = ageData.age();
 
@@ -92,11 +118,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 }
 
                 if (extractedAge == null || extractedAge == 0) {
-                    responseMessage = "รบกวนระบุตัวเลขอายุเป็นตัวเลขให้น้องทันใจหน่อยนะครับ (เช่น 25)";
+                    responseMessage = "รบกวนระบุตัวเลขอายุให้น้องทันใจหน่อยนะครับ (เช่น 25)";
                     break;
                 }
 
-                // 🟡 อายุต่ำกว่า 18 → แจ้งแอดมิน (แนะนำให้ผู้ปกครองดำเนินการ)
                 if (extractedAge < 18) {
                     userState.setCurrentState("ADMIN_MODE");
                     lineMessageService.sendEmergencyCard(
@@ -107,7 +132,6 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
 
-                // 🟡 อายุเกิน 55 → แจ้งแอดมินพิจารณา statement
                 if (extractedAge > 55) {
                     userState.setCurrentState("ADMIN_MODE");
                     lineMessageService.sendEmergencyCard(
@@ -118,12 +142,15 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
 
-                // 🟢 อายุผ่านเกณฑ์
-                userState.setCurrentState("STEP_5_FACEID");
-                responseMessage = "อายุ " + extractedAge + " ปี รับทราบครับ 👍\n\nถัดไปน้องทันใจขอเช็คประวัติเครื่องหน่อยครับ 🔍\n👉 เครื่องเคยแกะซ่อม หรือเปลี่ยนชิ้นส่วนใดๆ มาไหมครับ?";
+                userState.setCurrentState("STEP_6_FACEID");
+                responseMessage = "อายุ " + extractedAge + " ปี รับทราบครับ 👍\n\n" +
+                        "ถัดไปน้องทันใจขอเช็คประวัติเครื่องหน่อยครับ 🔍\n" +
+                        "👉 เครื่องเคยแกะซ่อม หรือเปลี่ยนชิ้นส่วนใดๆ มาไหมครับ?";
                 break;
 
-            case "STEP_5_FACEID":
+            // ══════════════════════════════════════════════════════════
+            case "STEP_6_FACEID": // ตรวจซ่อม → ถาม Face ID
+                // ══════════════════════════════════════════════════════════
                 ScreeningAnswer repairAns = aiScreeningService.interpret(msg, lastMessage);
                 if (repairAns == ScreeningAnswer.YES) {
                     userState.setCurrentState("REJECTED");
@@ -134,12 +161,13 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     responseMessage = "รบกวนตอบให้น้องทันใจชัดเจนอีกนิดครับ เช่น 'ไม่เคยแกะเลยครับ' หรือ 'เคยเปลี่ยนแบตครับ'";
                     break;
                 }
-
-                userState.setCurrentState("STEP_6_INSTALLMENT");
+                userState.setCurrentState("STEP_7_INSTALLMENT");
                 responseMessage = "โอเคครับ 👍 แล้ว **Face ID (สแกนหน้า)** ใช้งานได้ปกติไหมครับ?";
                 break;
 
-            case "STEP_6_INSTALLMENT":
+            // ══════════════════════════════════════════════════════════
+            case "STEP_7_INSTALLMENT": // ตรวจ Face ID → ถามติดผ่อน
+                // ══════════════════════════════════════════════════════════
                 ScreeningAnswer faceIdAns = aiScreeningService.interpret(msg, lastMessage);
                 if (faceIdAns == ScreeningAnswer.NO) {
                     userState.setCurrentState("REJECTED");
@@ -150,12 +178,13 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     responseMessage = "รบกวนตอบให้น้องทันใจทราบชัดๆ นิดนึงครับ เช่น 'ปกติครับ' หรือ 'สแกนไม่ได้ค่ะ'";
                     break;
                 }
-
-                userState.setCurrentState("STEP_7_DEVICE_PHOTOS");
+                userState.setCurrentState("STEP_8_DEVICE_PHOTOS");
                 responseMessage = "เยี่ยมเลยครับ 😊 แล้วเครื่องมี **ติดผ่อนกับร้านอื่น หรือติดใส่ iCloud ร้านอื่น** ไหมครับ?";
                 break;
 
-            case "STEP_7_DEVICE_PHOTOS":
+            // ══════════════════════════════════════════════════════════
+            case "STEP_8_DEVICE_PHOTOS": // ตรวจติดผ่อน → ขอรูปรอบเครื่อง
+                // ══════════════════════════════════════════════════════════
                 ScreeningAnswer installAns = aiScreeningService.interpret(msg, lastMessage);
                 if (installAns == ScreeningAnswer.YES) {
                     userState.setCurrentState("REJECTED");
@@ -166,29 +195,46 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     responseMessage = "รบกวนยืนยันใหม่อีกครั้งครับ เช่น 'ไม่ติดผ่อนครับ'";
                     break;
                 }
-
-                userState.setCurrentState("STEP_8_SETTINGS_PHOTO");
-                responseMessage = "ผ่านการตรวจสอบเบื้องต้นเรียบร้อยครับ 🎉✅\n\nรบกวนลูกค้า **ถ่ายรูปรอบเครื่อง 4-5 รูป** (หน้า-หลัง-ข้าง) ส่งมาให้น้องทันใจดูสภาพหน่อยครับ ✨";
+                userState.setCurrentState("STEP_9_SETTINGS_PHOTO");
+                responseMessage = "ผ่านการตรวจสอบเบื้องต้นเรียบร้อยครับ 🎉✅\n\n" +
+                        "รบกวนลูกค้า **ถ่ายรูปรอบเครื่อง 4-5 รูป** (หน้า-หลัง-ข้าง) ส่งมาให้น้องทันใจดูสภาพหน่อยครับ ✨";
                 break;
 
-            case "STEP_8_SETTINGS_PHOTO":
-                userState.setCurrentState("STEP_9_NAME");
+            // ══════════════════════════════════════════════════════════
+            case "STEP_9_SETTINGS_PHOTO": // รับรูปรอบเครื่อง → ขอรูปหน้าตั้งค่า
+                // ══════════════════════════════════════════════════════════
+                userState.setCurrentState("STEP_10_NAME");
                 lineMessageService.sendImage(userId, "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg");
-                responseMessage = "ได้รับรูปรอบเครื่องแล้วครับ! ✨\nสุดท้าย รบกวน **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'** ส่งมาให้หน่อยครับ (ตามรูปตัวอย่างด้านบนเลยครับ ☝️)";
+                responseMessage = "ได้รับรูปรอบเครื่องแล้วครับ! ✨\n" +
+                        "สุดท้าย รบกวน **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'** ส่งมาให้หน่อยครับ\n" +
+                        "(ตามรูปตัวอย่างด้านบนเลยครับ ☝️)";
                 break;
 
-            case "STEP_9_NAME":
-                userState.setCurrentState("STEP_10_SUBMIT_DATA");
-                responseMessage = "ได้รับข้อมูลครบครับ 📸\n👉 ขั้นตอนสุดท้าย รบกวนพิมพ์ **ชื่อ-นามสกุล** ส่งมาเพื่อใช้ประเมินราคาครับ ✍️";
+            // ══════════════════════════════════════════════════════════
+            case "STEP_10_NAME": // รับรูปตั้งค่า → ขอชื่อ
+                // ══════════════════════════════════════════════════════════
+                userState.setCurrentState("STEP_11_SUBMIT_DATA");
+                responseMessage = "ได้รับข้อมูลครบครับ 📸\n" +
+                        "👉 ขั้นตอนสุดท้าย รบกวนพิมพ์ **ชื่อ-นามสกุล** ส่งมาเพื่อใช้ประเมินราคาครับ ✍️";
                 break;
 
-            case "STEP_10_SUBMIT_DATA":
+            // ══════════════════════════════════════════════════════════
+            case "STEP_11_SUBMIT_DATA": // รับชื่อ → ส่งข้อมูลให้ Admin
+                // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("ADMIN_MODE");
                 userState.setFullName(msg);
-                lineMessageService.sendAdminApprovalCard(ADMIN_GROUP_ID, "รีบอลลูน", "balloon", msg + " (LINE: " + getCustomerName(userId) + ")", userId, "รุ่น: " + userState.getDeviceModel());
+                lineMessageService.sendAdminApprovalCard(
+                        ADMIN_GROUP_ID, "รีบอลลูน", "balloon",
+                        msg + " (LINE: " + getCustomerName(userId) + ")",
+                        userId,
+                        "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity()
+                );
                 responseMessage = "ได้รับข้อมูลครบถ้วนครับ 📝 น้องทันใจส่งเรื่องให้แอดมินตรวจสอบราคาประเมินและเครดิตให้แล้วครับ รบกวนรอสักครู่นะครับ ⏳";
                 break;
 
+            // ══════════════════════════════════════════════════════════
+            // Admin-triggered states (ชื่อคงเดิม ไม่แตะ)
+            // ══════════════════════════════════════════════════════════
             case "STEP_5_PRICING":
                 userState.setCurrentState("STEP_6_MONTH_SELECTION");
                 BalloonPrice price = getPriceForModel(userState.getDeviceModel());
@@ -218,7 +264,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
             case "ADMIN_MODE":
             case "REJECTED":
-                responseMessage = null; // บอทเงียบ
+                responseMessage = null;
                 break;
 
             default:
@@ -227,9 +273,6 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 break;
         }
 
-        // 🧠 ----------------------------------------------------
-        // สำคัญ: อัปเดตความจำ (lastMessage) และ Save ลง Database
-        // ----------------------------------------------------
         if (responseMessage != null) {
             userState.setLastUserMessage(msg);
         }

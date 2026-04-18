@@ -21,6 +21,8 @@ public class UserState {
     private String serviceName; // เก็บชื่อบริการ เช่น "รีบอลลูน"
     private String currentState; // เก็บ State ปัจจุบัน เช่น "STEP_1_INFO"
     private String previousState;
+    @Column(name = "capacity")
+    private String capacity;
 
     @Column(columnDefinition = "TEXT")
     private String lastUserMessage; // 🧠 ความจำ: ข้อความก่อนหน้า
