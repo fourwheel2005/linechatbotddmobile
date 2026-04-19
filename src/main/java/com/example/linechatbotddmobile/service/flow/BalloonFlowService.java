@@ -48,7 +48,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             userState.setCurrentState("ADMIN_MODE");
             userState.setLastUserMessage(msg);
             userStateRepository.save(userState);
-            lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), getCustomerName(userId), "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
+            lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
             return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินตัวจริงรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
         }
 
@@ -79,7 +79,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 userState.setDeviceModel(extractedModel);
                 userState.setCurrentState("STEP_3_PROVINCE");
                 responseMessage = "รับทราบครับ รุ่น **iPhone " + extractedModel + "** นะครับ! 📱\n" +
-                        "👉 สนใจความจุ **กี่ GB** ดีครับ? (เช่น 128, 256, 512)";
+                        "👉 สนใจความจุ **กี่ GB** ครับผม? (เช่น 128, 256, 512)";
                 break;
 
             // ══════════════════════════════════════════════════════════
@@ -124,20 +124,16 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 if (extractedAge < 18) {
                     userState.setCurrentState("ADMIN_MODE");
-                    lineMessageService.sendEmergencyCard(
-                            ADMIN_GROUP_ID, getServiceName(), getCustomerName(userId),
-                            "⚠️ ลูกค้าอายุต่ำกว่าเกณฑ์: " + extractedAge + " ปี — แนะนำให้ผู้ปกครองเป็นคนดำเนินการแทน"
-                    );
+                    // เปลี่ยนเป็น 👇
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุต่ำกว่าเกณฑ์: " + extractedAge + " ปี — แนะนำให้ผู้ปกครองเป็นคนดำเนินการแทน");
                     responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
                     break;
                 }
 
                 if (extractedAge > 55) {
                     userState.setCurrentState("ADMIN_MODE");
-                    lineMessageService.sendEmergencyCard(
-                            ADMIN_GROUP_ID, getServiceName(), getCustomerName(userId),
-                            "⚠️ ลูกค้าอายุเกินเกณฑ์: " + extractedAge + " ปี — กรุณาพิจารณาจากงาน / Statement / เงินเดือนของลูกค้าครับ"
-                    );
+                    // เปลี่ยนเป็น 👇
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุเกินเกณฑ์: " + extractedAge + " ปี — กรุณาพิจารณาจากงาน / Statement / เงินเดือนของลูกค้าครับ");
                     responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
                     break;
                 }
@@ -311,8 +307,16 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
                 userState.setCurrentState("ADMIN_MODE");
-                lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, "รีบอลลูน", getCustomerName(userId), "ลูกค้าเลือกระยะเวลา: " + msg + " เดือน");
-                responseMessage = "รับทราบครับ! น้องทันใจได้รับข้อมูลแล้ว 📝\nเดี๋ยวแอดมินตัวจริงจะเข้ามาสรุปยอด แจ้งเงื่อนไข และขอเอกสารทำสัญญาให้นะครับ รบกวนรอสักครู่ครับ ⏳";
+
+                lineMessageService.sendSuccessCard(
+                        ADMIN_GROUP_ID,
+                        "รีบอลลูน",
+                        "balloon",
+                        getCustomerName(userId),
+                        userId,
+                        "ลูกค้าเลือกระยะเวลา: " + msg + " เดือน"
+                );
+                responseMessage = "รับทราบครับ! น้องทันใจได้รับข้อมูลแล้ว 📝\nเดี๋ยวแอดมินจะเข้ามาสรุปยอด แจ้งเงื่อนไข และขอเอกสารทำสัญญาให้นะครับ รบกวนรอสักครู่ครับ ⏳";
                 break;
 
             case "ADMIN_MODE":

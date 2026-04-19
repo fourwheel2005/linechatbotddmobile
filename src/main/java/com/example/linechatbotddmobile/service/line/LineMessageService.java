@@ -37,6 +37,11 @@ public class LineMessageService {
     @Value("classpath:flex/emergency_card.json")
     private Resource emergencyCardTemplate;
 
+    @Value("classpath:flex/success_card.json")
+    private Resource successCardTemplate;
+
+    private String successCardJsonCache;
+
     // ตัวแปรสำหรับเก็บ Cache
     private String adminCardJsonCache;
     private String emergencyCardJsonCache;
@@ -46,6 +51,7 @@ public class LineMessageService {
         try {
             adminCardJsonCache = StreamUtils.copyToString(adminApprovalCardTemplate.getInputStream(), StandardCharsets.UTF_8);
             emergencyCardJsonCache = StreamUtils.copyToString(emergencyCardTemplate.getInputStream(), StandardCharsets.UTF_8);
+            successCardJsonCache = StreamUtils.copyToString(successCardTemplate.getInputStream(), StandardCharsets.UTF_8);
             log.info("✅ โหลด Flex Message Templates เข้าหน่วยความจำสำเร็จ (DDMobile)");
         } catch (Exception e) {
             log.error("❌ ไม่สามารถโหลด Flex Message Templates ได้ (ตรวจเช็คชื่อไฟล์ในโฟลเดอร์ resources/flex/): ", e);
@@ -71,15 +77,34 @@ public class LineMessageService {
     }
 
     /**
-     * 🚨 ส่งการ์ดฉุกเฉิน (Emergency Flex)
+     * 🎉 ส่งการ์ดแจ้งเตือนปิดการขาย (Success Flex)
      */
-    public void sendEmergencyCard(String toGroupId, String serviceName, String customerName, String reason) {
+    public void sendSuccessCard(String toGroupId, String serviceName, String serviceEn, String customerName, String userId, String extraInfo) {
         try {
-            // แทนที่ตัวแปร
+            String finalJson = successCardJsonCache
+                    .replace("{{SERVICE_NAME}}", escapeJson(serviceName))
+                    .replace("{{SERVICE_EN}}", escapeJson(serviceEn))
+                    .replace("{{CUSTOMER_NAME}}", escapeJson(customerName))
+                    .replace("{{USER_ID}}", escapeJson(userId))
+                    .replace("{{EXTRA_INFO}}", escapeJson(extraInfo));
+
+            executePushMessage(toGroupId, "🎉 ลูกค้ายืนยันจำนวนงวดแล้ว!", finalJson);
+        } catch (Exception e) {
+            log.error("❌ Error sendSuccessCard: ", e);
+            sendTextMessage(toGroupId, "🎉 ลูกค้ายืนยันการผ่อนแล้ว!\nลูกค้า: " + customerName + "\nรายละเอียด: " + extraInfo);
+        }
+    }
+
+
+    public void sendEmergencyCard(String toGroupId, String serviceName, String serviceEn, String customerName, String userId, String reason) {
+        try {
+            // แทนที่ตัวแปรให้ตรงกับ JSON
             String finalJson = emergencyCardJsonCache
                     .replace("{{SERVICE_NAME}}", escapeJson(serviceName))
+                    .replace("{{SERVICE_EN}}", escapeJson(serviceEn))
                     .replace("{{CUSTOMER_NAME}}", escapeJson(customerName))
-                    .replace("{{REASON}}", escapeJson(reason));
+                    .replace("{{USER_ID}}", escapeJson(userId))
+                    .replace("{{EXTRA_INFO}}", escapeJson(reason));
 
             executePushMessage(toGroupId, "🚨 ลูกค้าต้องการความช่วยเหลือ!", finalJson);
         } catch (Exception e) {
