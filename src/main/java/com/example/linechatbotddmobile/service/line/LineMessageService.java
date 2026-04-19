@@ -1,14 +1,26 @@
-package com.example.linechatbotddmobile.service.line; // ปรับ package ให้ตรงกับของคุณ
+package com.example.linechatbotddmobile.service.line;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.messaging.client.MessagingApiClient;
+import com.linecorp.bot.messaging.model.FlexMessage;
 import com.linecorp.bot.messaging.model.ImageMessage;
+import com.linecorp.bot.messaging.model.Message;
 import com.linecorp.bot.messaging.model.PushMessageRequest;
+import com.linecorp.bot.messaging.model.ReplyMessageRequest;
+import com.linecorp.bot.messaging.model.TextMessage;
+import com.linecorp.bot.messaging.model.FlexContainer;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -16,119 +28,127 @@ import java.util.List;
 public class LineMessageService {
 
     private final MessagingApiClient messagingApiClient;
-    // หากมีระบบอ่านไฟล์ JSON Flex จาก resources ก็เรียกใช้ตัวช่วยอ่านไฟล์ได้ที่นี่
-    // private final FlexMessageBuilder flexMessageBuilder;
+    private final ObjectMapper objectMapper;
+
+    // อ้างอิงไฟล์ JSON จากโฟลเดอร์ resources/flex/ (ตามภาพที่คุณแนบมา)
+    @Value("classpath:flex/admin_approval_card.json")
+    private Resource adminApprovalCardTemplate;
+
+    @Value("classpath:flex/emergency_card.json")
+    private Resource emergencyCardTemplate;
+
+    // ตัวแปรสำหรับเก็บ Cache
+    private String adminCardJsonCache;
+    private String emergencyCardJsonCache;
+
+    @PostConstruct
+    public void initTemplates() {
+        try {
+            adminCardJsonCache = StreamUtils.copyToString(adminApprovalCardTemplate.getInputStream(), StandardCharsets.UTF_8);
+            emergencyCardJsonCache = StreamUtils.copyToString(emergencyCardTemplate.getInputStream(), StandardCharsets.UTF_8);
+            log.info("✅ โหลด Flex Message Templates เข้าหน่วยความจำสำเร็จ (DDMobile)");
+        } catch (Exception e) {
+            log.error("❌ ไม่สามารถโหลด Flex Message Templates ได้ (ตรวจเช็คชื่อไฟล์ในโฟลเดอร์ resources/flex/): ", e);
+        }
+    }
 
     /**
-     * ส่งข้อความตัวอักษรปกติ (Push Message)
+     * 📝 ส่งการ์ดขออนุมัติราคา (Admin Approval Flex)
      */
+    public void sendAdminApprovalCard(String toGroupId, String serviceName, String serviceType, String customerDetails, String userId, String extraInfo) {
+        try {
+            // แทนที่ตัวแปรด้วยข้อมูลจริง (ป้องกัน JSON Injection ด้วย escapeJson)
+            String finalJson = adminCardJsonCache
+                    .replace("{{SERVICE_NAME}}", escapeJson(serviceName))
+                    .replace("{{SERVICE_TYPE}}", escapeJson(serviceType))
+                    .replace("{{CUSTOMER_DETAILS}}", escapeJson(customerDetails))
+                    .replace("{{USER_ID}}", escapeJson(userId))
+                    .replace("{{EXTRA_INFO}}", escapeJson(extraInfo));
+
+            executePushMessage(toGroupId, "📝 มีเคสรออนุมัติ/ประเมินราคาใหม่", finalJson);
+        } catch (Exception e) {
+            log.error("❌ Error sendAdminApprovalCard: ", e);
+            sendTextMessage(toGroupId, "📝 รออนุมัติ\nลูกค้า: " + customerDetails + "\n" + extraInfo);
+        }
+    }
+
+    /**
+     * 🚨 ส่งการ์ดฉุกเฉิน (Emergency Flex)
+     */
+    public void sendEmergencyCard(String toGroupId, String serviceName, String customerName, String reason) {
+        try {
+            // แทนที่ตัวแปร
+            String finalJson = emergencyCardJsonCache
+                    .replace("{{SERVICE_NAME}}", escapeJson(serviceName))
+                    .replace("{{CUSTOMER_NAME}}", escapeJson(customerName))
+                    .replace("{{REASON}}", escapeJson(reason));
+
+            executePushMessage(toGroupId, "🚨 ลูกค้าต้องการความช่วยเหลือ!", finalJson);
+        } catch (Exception e) {
+            log.error("❌ Error sendEmergencyCard: ", e);
+            sendTextMessage(toGroupId, "🚨 แจ้งเตือนแอดมิน!\nลูกค้า: " + customerName + "\nสาเหตุ: " + reason);
+        }
+    }
+
+    // =========================================================
+    // Core Messaging Methods
+    // =========================================================
+
     public void sendTextMessage(String toUserId, String text) {
         try {
             messagingApiClient.pushMessage(
-                    null,
-                    new PushMessageRequest(
-                            toUserId,
-                            List.of(new com.linecorp.bot.messaging.model.TextMessage(text)),
-                            false,
-                            (List<String>) null
-                    )
+                    UUID.randomUUID(),
+                    new PushMessageRequest(toUserId, List.of(new TextMessage(text)), false, null)
             );
-            log.info("📤 ส่งข้อความหา {} สำเร็จ", toUserId);
         } catch (Exception e) {
             log.error("❌ ล้มเหลวในการส่งข้อความหา {}: ", toUserId, e);
         }
     }
 
-    /**
-     * ส่งรูปภาพ (Push Image)
-     * ใช้สำหรับส่งตัวอย่างหน้าจอตั้งค่าให้ลูกค้าดู
-     */
-    public void sendImage(String toUserId, String imageUrl) {
+    public void replyText(String replyToken, String text) {
         try {
-            URI uri = URI.create(imageUrl);
-            ImageMessage imageMessage = new ImageMessage(uri, uri); // Original URL, Preview URL
-
-            messagingApiClient.pushMessage(
-                    null,
-                    new PushMessageRequest(
-                            toUserId,
-                            List.of(imageMessage),
-                            false,
-                            (List<String>) null
-                    )
-            );
-            log.info("📸 ส่งรูปภาพหา {} สำเร็จ", toUserId);
+            List<Message> messages = List.of(new TextMessage(text));
+            messagingApiClient.replyMessage(new ReplyMessageRequest(replyToken, messages, false));
         } catch (Exception e) {
-            log.error("❌ ล้มเหลวในการส่งรูปภาพหา {}: ", toUserId, e);
+            log.error("❌ ไม่สามารถตอบกลับข้อความได้: ", e);
         }
     }
 
-    /**
-     * 🚨 ส่งการ์ดฉุกเฉิน (Emergency Flex) เข้ากลุ่มแอดมิน
-     * เมื่อลูกค้าหงุดหงิด หรือพิมพ์คำว่า "แอดมิน"
-     */
-    public void sendEmergencyCard(String toGroupId, String serviceName, String customerName, String reason) {
-        log.info("🚨 กำลังส่ง Emergency Card ไปที่กลุ่ม: {} (ลูกค้า: {})", toGroupId, customerName);
-
-        // -------------------------------------------------------------
-        // TODO: นำเข้า JSON String ของ Flex Message ที่คุณออกแบบไว้ที่นี่
-        // หรือดึงจากไฟล์ resources/flex/emergency_card.json
-        // -------------------------------------------------------------
-
-        // เพื่อให้โปรเจกต์รันผ่านไปก่อน ผมจะสร้าง Flex Message แบบง่าย (Bubble) ผ่าน Code ให้ดูครับ
-        // (แนะนำให้เปลี่ยนไปใช้การอ่านไฟล์ JSON ในอนาคตเพื่อความสวยงามและแก้ง่าย)
-
+    public void sendImage(String to, String imageUrl) {
         try {
-            String altText = "🚨 ลูกค้าต้องการความช่วยเหลือ!";
-
-            // สร้างข้อความแจ้งเตือนแบบ Text ไปก่อน (หากยังไม่มี Flex JSON)
-            // หากคุณมี Flex Builder แล้ว สามารถแปลง JSON เป็น FlexContainer แล้วใส่แทน TextMessage ได้
-            String alertMsg = String.format("🚨 **แจ้งเตือนแอดมิน!** 🚨\n" +
-                            "บริการ: %s\n" +
-                            "ลูกค้า: %s\n" +
-                            "สาเหตุ: %s\n\n" +
-                            "👉 แอดมินกรุณาเข้าไปดูแลลูกค้าในแชท 1-on-1 ด่วนครับ!",
-                    serviceName, customerName, reason);
-
-            sendTextMessage(toGroupId, alertMsg);
-
-            // ตัวอย่างการส่ง Flex ถ้ามี JSON (ต้องใช้ไลบรารีแปลง JSON เป็น FlexContainer ของ LINE SDK)
-            // FlexContainer flexContainer = flexMessageBuilder.buildEmergencyFlex(customerName, reason);
-            // FlexMessage flexMessage = new FlexMessage(altText, flexContainer);
-            // messagingApiClient.pushMessage(null, new PushMessageRequest(toGroupId, List.of(flexMessage), false, null));
-
+            ImageMessage imageMessage = new ImageMessage(URI.create(imageUrl), URI.create(imageUrl));
+            PushMessageRequest pushMessageRequest = new PushMessageRequest(to, List.of(imageMessage), false, null);
+            messagingApiClient.pushMessage(UUID.randomUUID(), pushMessageRequest).get();
         } catch (Exception e) {
-            log.error("❌ ล้มเหลวในการส่ง Emergency Card", e);
+            log.error("❌ เกิดข้อผิดพลาดในการส่งรูปภาพถึง: {}", to, e);
         }
     }
 
+    // =========================================================
+    // Private Helper Methods
+    // =========================================================
+
+    private void executePushMessage(String groupId, String altText, String jsonPayload) throws Exception {
+        FlexContainer flexContainer = objectMapper.readValue(jsonPayload, FlexContainer.class);
+        FlexMessage flexMessage = new FlexMessage(altText, flexContainer);
+
+        PushMessageRequest request = new PushMessageRequest(
+                groupId,
+                List.of(flexMessage),
+                false,
+                null
+        );
+
+        messagingApiClient.pushMessage(UUID.randomUUID(), request);
+    }
+
     /**
-     * 📝 ส่งการ์ดขออนุมัติราคา (Admin Approval Flex) เข้ากลุ่มแอดมิน
-     * เมื่อลูกค้ายื่นเรื่องรีบอลลูนเสร็จสมบูรณ์
+     * 🛡️ ระบบความปลอดภัย (JSON Anti-Injection)
      */
-    public void sendAdminApprovalCard(String toGroupId, String serviceName, String serviceType, String customerDetails, String customerId, String extraInfo) {
-        log.info("📝 กำลังส่ง Approval Card ไปที่กลุ่ม: {} (ลูกค้า: {})", toGroupId, customerDetails);
-
-        // -------------------------------------------------------------
-        // TODO: นำเข้า JSON String ของ Flex Message ที่คุณออกแบบไว้ที่นี่
-        // -------------------------------------------------------------
-
-        try {
-            // สร้างข้อความแจ้งเตือนแบบ Text ชั่วคราว (จนกว่าคุณจะประกอบ JSON Flex เสร็จ)
-            String approvalMsg = String.format("📝 **รออนุมัติ / ประเมินราคา** 📝\n" +
-                            "บริการ: %s\n" +
-                            "ลูกค้า: %s\n" +
-                            "รายละเอียด: %s\n\n" +
-                            "👉 แอดมินกรุณาตรวจสอบสภาพเครื่อง และกดส่งราคาในระบบครับ",
-                    serviceName, customerDetails, extraInfo);
-
-            sendTextMessage(toGroupId, approvalMsg);
-
-            // ถ้ามี Flex JSON ก็ใช้ Postback Action แนบไปกับปุ่ม
-            // ตัวอย่าง Data สำหรับปุ่มอนุมัติ: "action=approve&service=" + serviceType + "&userId=" + customerId
-
-        } catch (Exception e) {
-            log.error("❌ ล้มเหลวในการส่ง Approval Card", e);
-        }
+    private String escapeJson(String input) {
+        if (input == null) return "-";
+        return input.replace("\"", "\\\"")
+                .replace("\n", " ")
+                .replace("\r", "");
     }
 }
