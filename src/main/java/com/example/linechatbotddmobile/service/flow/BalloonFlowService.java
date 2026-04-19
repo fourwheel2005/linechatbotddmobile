@@ -207,16 +207,13 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 break;
 
             // ══════════════════════════════════════════════════════════
-            case "STEP_9_SETTINGS_PHOTO": // รับรูปรอบเครื่อง → ขอรูปหน้าตั้งค่า (พร้อมตัวอย่าง)
+            case "STEP_9_SETTINGS_PHOTO": // รับรูปรอบเครื่อง → ส่ง Flex ให้แอดมินตรวจ
                 // ══════════════════════════════════════════════════════════
-
-                // 1. ถ้าสิ่งที่ส่งมาคือรูปภาพ (จาก Webhook 3 วินาที) ให้ตอบกลับให้พิมพ์ยืนยัน
                 if (msg.equals("[รูปภาพ]")) {
                     return "น้องทันใจได้รับรูปแล้วครับ 📸 ทยอยส่งมาให้ครบ 4-5 รูปได้เลยนะครับ\n" +
                             "(หากส่งครบแล้ว รบกวนพิมพ์บอกแอดมินว่า **'ครบแล้ว'** ด้วยนะครับ ✨)";
                 }
 
-                // 2. ตรวจสอบว่าลูกค้าพิมพ์คำว่าครบหรือยัง
                 boolean isImageBatchReceived = msg.contains("ครบ") ||
                         msg.contains("ส่งแล้ว") ||
                         msg.contains("เรียบร้อย");
@@ -226,16 +223,39 @@ public class BalloonFlowService implements ServiceFlowHandler {
                             "(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)";
                 }
 
-                // ✅ 3. ถ้ารับคำว่า 'ครบแล้ว' จริงๆ -> ให้ไปต่อ
+                // ✅ ถ้ารับคำว่า 'ครบแล้ว' จริงๆ -> เปลี่ยน State เป็นรอแอดมินตรวจรูป
+                userState.setCurrentState("ADMIN_PHOTO_CHECK");
+                userState.setLastUserMessage(msg); // เพิ่มด้วย
+                userStateRepository.save(userState); // ← เพิ่มบรรทัดนี้
+
+
+                // ส่งการ์ดให้แอดมิน (ใช้ชื่อ LINE ไปก่อนเพราะยังไม่ได้ขอชื่อจริง)
+                lineMessageService.sendAdminApprovalCard(
+                        ADMIN_GROUP_ID,
+                        "ตรวจสภาพเครื่อง (รีบอลลูน)",
+                        "balloon",
+                        getCustomerName(userId),
+                        userId,
+                        "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity() + "\n(แอดมินโปรดตรวจรูปรอบเครื่อง 4-5 รูป)"
+                );
+
+                return "ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอเวลาตรวจสอบสภาพภายนอกสักครู่นะครับ รบกวนรอสักครู่ครับ ⏳";
+
+            // ══════════════════════════════════════════════════════════
+            case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ -> บอทส่งข้อความขอรูปแคปหน้าจอ
+                // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
+                userStateRepository.save(userState);
                 String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
+
+                // บอทยิงรูปภาพตัวอย่างไปก่อน
                 lineMessageService.sendImage(userId, exampleImageUrl);
 
-                responseMessage = "ได้รับรูปรอบเครื่องเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
+                // ตามด้วยข้อความบอกให้แคปหน้าจอส่งมา
+                return "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
                         "ถัดไป รบกวนลูกค้า **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'**\n" +
                         "ส่งมาให้แอดมินดูรุ่นและความจุที่แน่นอนหน่อยครับ\n" +
                         "(ตามรูปตัวอย่างที่แอดมินส่งให้ด้านบนเลยครับ ☝️)";
-                break;
 
             // ══════════════════════════════════════════════════════════
             case "STEP_10_NAME": // รับรูปหน้าตั้งค่า → ขอชื่อ
@@ -296,6 +316,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 break;
 
             case "ADMIN_MODE":
+            case "ADMIN_PHOTO_CHECK":
             case "REJECTED":
                 responseMessage = null;
                 break;

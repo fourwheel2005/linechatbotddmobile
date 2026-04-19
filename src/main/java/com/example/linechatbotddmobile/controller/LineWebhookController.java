@@ -170,23 +170,49 @@ public class LineWebhookController {
                 case "approve":
                 case "approve_doc":
                 case "approve_credit":
-                    adminReplyMessage = "✅ เคสของลูกค้าอนุมัติผ่านเรียบร้อย! ระบบแจ้งลูกค้าแล้วครับ";
-                    messageToCustomer = "🎉 ยินดีด้วยครับ! ข้อมูลของคุณได้รับการอนุมัติเรียบร้อยแล้ว แอดมินจะรีบดำเนินการขั้นตอนต่อไปให้นะครับ";
+                    // 💡 เช็คว่าแอดมินกดอนุมัติในขั้นตอนไหน?
+                    if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
+                        // 1. กรณีอนุมัติ "รูปรอบเครื่อง"
+                        adminReplyMessage = "✅ ตรวจสภาพผ่าน! บอทกำลังขอรูปตั้งค่าต่อครับ";
 
-                    if ("balloon".equals(serviceName) || "รีบอลลูน".equals(serviceName)) {
+                        // ให้ Flow ไปที่สเต็ปขอรูปตั้งค่า
+                        state.setCurrentState("STEP_9_APPROVED_PHOTO");
+                        userStateRepository.save(state);
+
+                        // กระตุ้นให้ Flow ส่งข้อความ + รูปตัวอย่าง ให้ลูกค้า
+                        String nextStepMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
+                        if (nextStepMessage != null) {
+                            messageToCustomer = nextStepMessage; // ใช้ข้อความจาก Flow ส่งให้ลูกค้า
+                        }
+                    } else {
+                        // 2. กรณีอนุมัติ "ขั้นสุดท้าย" (ประเมินเครดิตและส่งราคา)
+                        adminReplyMessage = "✅ อนุมัติเคสผ่านเรียบร้อย! ระบบส่งราคาให้ลูกค้าแล้วครับ";
+                        messageToCustomer = "🎉 ยินดีด้วยครับ! ข้อมูลของคุณได้รับการอนุมัติเรียบร้อยแล้ว แอดมินจะรีบดำเนินการขั้นตอนต่อไปให้นะครับ";
+
                         state.setCurrentState("STEP_5_PRICING");
                         userStateRepository.save(state);
 
                         // กระตุ้นให้ Flow ส่งราคา
                         String nextStepMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
-                        if (nextStepMessage != null) messageToCustomer += "\n\n" + nextStepMessage;
+                        if (nextStepMessage != null) {
+                            messageToCustomer += "\n\n" + nextStepMessage;
+                        }
                     }
                     break;
 
                 case "reject":
                 case "reject_credit":
-                    adminReplyMessage = "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ";
-                    messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
+                    if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
+                        // 1. ปฏิเสธเคสเพราะสภาพรูปเครื่องไม่ผ่าน
+                        adminReplyMessage = "❌ ปฏิเสธสภาพเครื่องเรียบร้อยครับ (บอทแจ้งลูกค้าแล้ว)";
+                        messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบรูปภาพ สภาพเครื่องยังไม่ตรงตามเงื่อนไขการรับเครื่องของทางร้านครับ หากมีข้อสงสัยสอบถามแอดมินเพิ่มเติมได้เลยครับ";
+                    } else {
+                        // 2. ปฏิเสธเคสขั้นสุดท้าย
+                        adminReplyMessage = "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ";
+                        messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
+                    }
+                    state.setCurrentState("REJECTED");
+                    userStateRepository.save(state);
                     break;
 
                 case "take_case":

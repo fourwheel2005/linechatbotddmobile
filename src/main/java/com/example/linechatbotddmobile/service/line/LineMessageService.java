@@ -52,18 +52,16 @@ public class LineMessageService {
         }
     }
 
-    /**
-     * 📝 ส่งการ์ดขออนุมัติราคา (Admin Approval Flex)
-     */
+
     public void sendAdminApprovalCard(String toGroupId, String serviceName, String serviceType, String customerDetails, String userId, String extraInfo) {
         try {
-            // แทนที่ตัวแปรด้วยข้อมูลจริง (ป้องกัน JSON Injection ด้วย escapeJson)
+            // 👇 แก้ไขตรง .replace ให้ตรงกับไฟล์ JSON ของคุณเป๊ะๆ
             String finalJson = adminCardJsonCache
                     .replace("{{SERVICE_NAME}}", escapeJson(serviceName))
-                    .replace("{{SERVICE_TYPE}}", escapeJson(serviceType))
-                    .replace("{{CUSTOMER_DETAILS}}", escapeJson(customerDetails))
+                    .replace("{{SERVICE_EN}}", escapeJson(serviceType))         // เปลี่ยนเป็น {{SERVICE_EN}}
+                    .replace("{{CUSTOMER_NAME}}", escapeJson(customerDetails))  // เปลี่ยนเป็น {{CUSTOMER_NAME}}
                     .replace("{{USER_ID}}", escapeJson(userId))
-                    .replace("{{EXTRA_INFO}}", escapeJson(extraInfo));
+                    .replace("{{DEVICE_MODEL}}", escapeJson(extraInfo));        // เปลี่ยนเป็น {{DEVICE_MODEL}}
 
             executePushMessage(toGroupId, "📝 มีเคสรออนุมัติ/ประเมินราคาใหม่", finalJson);
         } catch (Exception e) {
