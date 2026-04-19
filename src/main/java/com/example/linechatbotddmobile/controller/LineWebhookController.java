@@ -87,7 +87,14 @@ public class LineWebhookController {
                 String customerName = getCustomerName(lineUserId);
 
                 // แจ้งเตือนแอดมินในกลุ่ม
-                lineMessageService.sendEmergencyCard(MAIN_ADMIN_GROUP_ID, "ติดต่อทั่วไป", customerName, "ลูกค้าต้องการคุยกับคน หรือ หงุดหงิดบอท");
+                lineMessageService.sendEmergencyCard(
+                        MAIN_ADMIN_GROUP_ID,
+                        "ติดต่อทั่วไป",
+                        "general",
+                        customerName,
+                        lineUserId,
+                        "ลูกค้าต้องการคุยกับคน หรือ หงุดหงิดบอท"
+                );
 
                 // ตอบกลับลูกค้า
                 messagingApiClient.replyMessage(new ReplyMessageRequest(
