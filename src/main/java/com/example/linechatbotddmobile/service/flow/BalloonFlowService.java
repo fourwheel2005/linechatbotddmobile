@@ -49,7 +49,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             userState.setLastUserMessage(msg);
             userStateRepository.save(userState);
             lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
-            return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินตัวจริงรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
+            return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
         }
 
         String responseMessage = null;
@@ -64,17 +64,39 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         "👉 ลูกค้าใช้ไอโฟน **รุ่นไหน** ครับ? (เช่น 13 Pro Max, 15 Pro, 16)";
                 break;
 
-            // ══════════════════════════════════════════════════════════
+
             case "STEP_2_CAPACITY": // รับรุ่น → ถามความจุ
-                // ══════════════════════════════════════════════════════════
                 log.info("🤖 [รีบอลลูน] STEP_2 AI สกัดรุ่นจาก: {}", msg);
+
+                // 1. ให้ AI ลองสกัดดูก่อน
                 ExtractedData modelData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 String extractedModel = modelData.deviceModel();
 
+                // 2. 🛡️ ระบบ Fallback ดักจับตัวเลขรุ่นแบบเพียวๆ (กัน AI เอ๋อ)
+                if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
+                    // ตรวจจับข้อความที่เริ่มต้นด้วยตัวเลข 11-17
+                    // และอาจจะตามด้วยคำว่า pro, max, plus, mini
+                    if (msg.matches("^(1[1-7])(?:\\s*(pro|max|plus|mini|pm|p))?.*$")) {
+                        // ดึงเฉพาะตัวเลข 2 ตัวแรกออกมาเป็นชื่อรุ่นตั้งต้นก่อน
+                        String baseModel = msg.substring(0, 2);
+
+                        // เติมรุ่นย่อย (ถ้ามี)
+                        if (msg.contains("pro max") || msg.contains("pm")) extractedModel = baseModel + " Pro Max";
+                        else if (msg.contains("pro") || msg.contains("p")) extractedModel = baseModel + " Pro";
+                        else if (msg.contains("plus")) extractedModel = baseModel + " Plus";
+                        else if (msg.contains("mini")) extractedModel = baseModel + " mini";
+                        else extractedModel = baseModel; // ถ้ามีแต่ตัวเลขเพียวๆ
+
+                        log.info("🛡️ [Fallback] จับชื่อรุ่นได้จาก Regex: {}", extractedModel);
+                    }
+                }
+
+                // 3. ถ้ายังไม่ได้อีก ค่อยเด้งถามลูกค้าใหม่
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
                     responseMessage = "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱";
                     break;
                 }
+
 
                 userState.setDeviceModel(extractedModel);
                 userState.setCurrentState("STEP_3_PROVINCE");
@@ -344,33 +366,32 @@ public class BalloonFlowService implements ServiceFlowHandler {
     }
 
     private BalloonPrice getPriceForModel(String modelName) {
-        if (modelName == null) return null;
+        if (modelName == null || modelName.trim().isEmpty()) return null;
         String m = modelName.toLowerCase().replace("iphone ", "").trim();
         return switch (m) {
-            case "12 mini"    -> new BalloonPrice(3500,  1190,  890,  790,  690);
-            case "12"         -> new BalloonPrice(4000,  1290, 1090,  890,  790);
-            case "12 pro"     -> new BalloonPrice(4500,  1490, 1190,  990,  890);
-            case "12 pro max" -> new BalloonPrice(5000,  1590, 1290, 1090,  990);
-            case "13 mini"    -> new BalloonPrice(4500,  1490, 1190,  990,  890);
-            case "13"         -> new BalloonPrice(6000,  1990, 1590, 1290, 1190);
+            case "12"         -> new BalloonPrice(3500,  1190,  890,  790,  690);
+            case "12 pro"     -> new BalloonPrice(4000,  1290, 1090,  890,  790);
+            case "12 pro max" -> new BalloonPrice(4000,  1290, 1090,  890,  790);
+            case "13 mini"    -> new BalloonPrice(3500,  1190,  890,  790,  690);
+            case "13"         -> new BalloonPrice(5000,  1590, 1290, 1090,  990);
             case "13 pro"     -> new BalloonPrice(7000,  2290, 1790, 1590, 1390);
             case "13 pro max" -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
-            case "14"         -> new BalloonPrice(8000,  2550, 2050, 1750, 1550);
-            case "14 plus"    -> new BalloonPrice(9000,  2850, 2250, 1950, 1750);
-            case "14 pro"     -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
-            case "14 pro max" -> new BalloonPrice(12000, 3850, 3050, 2550, 2350);
-            case "15"         -> new BalloonPrice(11000, 3550, 2750, 2390, 2150);
-            case "15 plus"    -> new BalloonPrice(12000, 3850, 3050, 2550, 2350);
-            case "15 pro"     -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
-            case "15 pro max" -> new BalloonPrice(15000, 4790, 3790, 3290, 2890);
-            case "16e"        -> new BalloonPrice(10000, 3190, 2590, 2190, 1990);
-            case "16"         -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
-            case "16 plus"    -> new BalloonPrice(15000, 4790, 3750, 3290, 2890);
-            case "16 pro"     -> new BalloonPrice(17000, 5390, 4290, 3690, 3290);
-            case "16 pro max" -> new BalloonPrice(20000, 6390, 4990, 4290, 3890);
+            case "14"         -> new BalloonPrice(7000,  2290, 1790, 1590, 1390);
+            case "14 plus"    -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
+            case "14 pro"     -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
+            case "14 pro max" -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
+            case "15"         -> new BalloonPrice(10000, 3190, 2590, 2190, 1990);
+            case "15 plus"    -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
+            case "15 pro"     -> new BalloonPrice(12000, 3850, 3050, 2550, 2350);
+            case "15 pro max" -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
+            case "16e"        -> new BalloonPrice(8000,  2550, 2050, 1750, 1550);
+            case "16"         -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
+            case "16 plus"    -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
+            case "16 pro"     -> new BalloonPrice(15000, 4790, 3790, 3290, 2890);
+            case "16 pro max" -> new BalloonPrice(18000, 5690, 4590, 3990, 3490);
             case "17"         -> new BalloonPrice(16000, 5090, 3990, 3490, 3090);
-            case "17 air"     -> new BalloonPrice(20000, 6390, 4990, 4390, 3890);
-            case "17 pro"     -> new BalloonPrice(22000, 6990, 5490, 4790, 4290);
+            case "17 air"     -> new BalloonPrice(15000, 4790, 3790, 3290, 2890);
+            case "17 pro"     -> new BalloonPrice(21000, 6690, 5290, 4620, 4190);
             case "17 pro max" -> new BalloonPrice(25000, 7990, 6290, 5390, 4790);
             default -> null;
         };

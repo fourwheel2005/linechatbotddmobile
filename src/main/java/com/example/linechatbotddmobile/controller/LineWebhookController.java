@@ -98,7 +98,7 @@ public class LineWebhookController {
 
                 // ตอบกลับลูกค้า
                 messagingApiClient.replyMessage(new ReplyMessageRequest(
-                        replyToken, List.of(new TextMessage("รับทราบครับ 🙏 แอดมินตัวจริงรับเรื่องแล้ว รบกวนรอสักครู่นะครับ ⏳")), false
+                        replyToken, List.of(new TextMessage("รับทราบครับ 🙏 แอดมินรับเรื่องแล้ว รบกวนรอสักครู่นะครับ ⏳")), false
                 ));
                 return; // 🛑 จบการทำงาน ไม่ส่งเข้า Flow
             }
@@ -224,14 +224,14 @@ public class LineWebhookController {
 
                 case "take_case":
                     adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้าต่อในแชท 1-on-1 ได้เลยครับ";
-                    messageToCustomer = "แอดมินตัวจริงมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
+                    messageToCustomer = "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
                     state.setCurrentState("ADMIN_MODE");
                     userStateRepository.save(state);
                     break;
 
                 case "resume_bot":
                     adminReplyMessage = "▶️ เปิดบอทให้ดูแลลูกค้าคนนี้ต่อแล้วครับ";
-                    messageToCustomer = "บอทน้องทันใจ กลับมาดูแลต่อแล้วครับ! มีอะไรให้ช่วยบอกได้เลยครับ ✨";
+                    messageToCustomer = "น้องทันใจ กลับมาดูแลต่อแล้วครับ! มีอะไรให้ช่วยบอกได้เลยครับ ✨";
                     state.setCurrentState(null); // ล้าง State ให้เริ่มใหม่
                     state.setServiceName(null);
                     userStateRepository.save(state);
