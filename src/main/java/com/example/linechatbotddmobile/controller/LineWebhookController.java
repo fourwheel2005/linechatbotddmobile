@@ -36,6 +36,18 @@ public class LineWebhookController {
     private final String MAIN_ADMIN_GROUP_ID = "Ced29a5fec5e581b47ffa61d9845e71bf";
 
     // ==========================================
+    // 🎉 รับ Event ลูกค้า Add Friend ใหม่
+    // ==========================================
+    @EventMapping
+    public void handleFollowEvent(FollowEvent event) {
+        String lineUserId = event.source().userId();
+        log.info("🎉 มีลูกค้าแอดเพื่อนใหม่: {}", lineUserId);
+
+        // ยิง Flex Message ต้อนรับไปหาลูกค้า
+        lineMessageService.sendWelcomeCard(lineUserId);
+    }
+
+    // ==========================================
     // ✉️ & 📸 รับ Event ข้อความและรูปภาพ
     // ==========================================
     @EventMapping
@@ -149,6 +161,51 @@ public class LineWebhookController {
                 }
             }).start();
         }
+        // ==========================================
+        // 4. 🛡️ กรณีลูกค้าส่ง "สติกเกอร์"
+        // ==========================================
+        else if (event.message() instanceof StickerMessageContent) {
+            log.info("🛡️ ลูกค้าส่งสติกเกอร์ -> แจ้งเตือนให้พิมพ์ข้อความ");
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken,
+                    List.of(new TextMessage("น้องทันใจยังไม่เข้าใจความหมายของสติกเกอร์ครับ 😅 รบกวนลูกค้าพิมพ์เป็นข้อความแจ้งน้องอีกครั้งนะครับ 🙏")),
+                    false
+            ));
+        }
+        // ==========================================
+        // 5. 🛡️ กรณีลูกค้าส่ง "เสียง (Voice Message)" หรือ "วิดีโอ"
+        // ==========================================
+        else if (event.message() instanceof AudioMessageContent || event.message() instanceof VideoMessageContent) {
+            log.info("🛡️ ลูกค้าส่งเสียงหรือวิดีโอ -> แจ้งเตือนให้พิมพ์ข้อความ/รูป");
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken,
+                    List.of(new TextMessage("ขออภัยด้วยครับ 😅 น้องทันใจยังไม่สามารถฟังเสียงหรือดูวิดีโอได้ รบกวนลูกค้าพิมพ์ข้อความ หรือส่งเป็นรูปภาพนิ่งน้า 🙏")),
+                    false
+            ));
+        }
+        // ==========================================
+        // 6. 🛡️ กรณีลูกค้าส่ง "Location (แผนที่)"
+        // ==========================================
+        else if (event.message() instanceof LocationMessageContent locationMessage) {
+            log.info("🛡️ ลูกค้าส่ง Location");
+
+            // แอบดึงชื่อจังหวัดหรือที่อยู่จาก Location ออกมาให้ AI ประมวลผลต่อได้เลย! (ถือว่าลูกค้าพิมพ์ข้อความ)
+            String addressInfo = locationMessage.address() != null ? locationMessage.address() : "";
+            String titleInfo = locationMessage.title() != null ? locationMessage.title() : "";
+            String combinedLocationText = titleInfo + " " + addressInfo;
+
+            // โยนข้อมูลที่อยู่ เข้าไปใน Flow เหมือนลูกค้าพิมพ์ตัวอักษรปกติ
+            String replyText = chatFlowManager.handleTextMessage(lineUserId, combinedLocationText);
+            if (replyText != null && !replyText.isEmpty()) {
+                messagingApiClient.replyMessage(new ReplyMessageRequest(
+                        replyToken, List.of(new TextMessage(replyText)), false
+                ));
+            } else {
+                messagingApiClient.replyMessage(new ReplyMessageRequest(
+                        replyToken, List.of(new TextMessage("น้องทันใจได้รับพิกัดแล้วครับ 📍 รบกวนลูกค้าพิมพ์ยืนยัน 'ชื่อจังหวัด' ให้น้องทันใจอีกครั้งเพื่อความชัวร์นะครับ 😊")), false
+                ));
+            }
+        }
     }
 
     // ==========================================
@@ -231,10 +288,19 @@ public class LineWebhookController {
 
                 case "resume_bot":
                     adminReplyMessage = "▶️ เปิดบอทให้ดูแลลูกค้าคนนี้ต่อแล้วครับ";
-                    messageToCustomer = "น้องทันใจ กลับมาดูแลต่อแล้วครับ! มีอะไรให้ช่วยบอกได้เลยครับ ✨";
-                    state.setCurrentState(null); // ล้าง State ให้เริ่มใหม่
-                    state.setServiceName(null);
+
+                    // 👇 ดึงความจำเดิมกลับมา
+                    String prevState = state.getPreviousState();
+                    if (prevState != null) {
+                        state.setCurrentState(prevState); // กลับไปสเต็ปที่ค้างอยู่
+                        state.setPreviousState(null); // ล้างความจำทิ้ง
+                    } else {
+                        state.setCurrentState("STEP_1_INFO"); // กันเหนียวกรณีไม่มีความจำ
+                    }
                     userStateRepository.save(state);
+
+                    // 👇 แจ้งให้ลูกค้าทราบว่าบอทกลับมาแล้ว และให้ลูกค้าพิมพ์ข้อมูลให้บอทเก็บลง Database
+                    messageToCustomer = "น้องทันใจกลับมาดูแลต่อแล้วครับ ✨ รบกวนลูกค้าพิมพ์คำตอบของขั้นตอนเมื่อสักครู่นี้ ให้น้องทันใจบันทึกลงระบบอีกครั้งนะครับ 👇";
                     break;
             }
 

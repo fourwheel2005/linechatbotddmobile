@@ -29,4 +29,10 @@ public class UserState {
 
     private String deviceModel;
     private String fullName;
+
+    @Column(name = "province")
+    private String province;
+
+    @Column(name = "retry_count")
+    private Integer retryCount = 0; // กำหนดค่าเริ่มต้นเป็น 0
 }

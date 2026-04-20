@@ -42,6 +42,11 @@ public class LineMessageService {
 
     private String successCardJsonCache;
 
+    @Value("classpath:flex/welcome_card.json")
+    private Resource welcomeCardTemplate;
+
+    private String welcomeCardJsonCache;
+
     // ตัวแปรสำหรับเก็บ Cache
     private String adminCardJsonCache;
     private String emergencyCardJsonCache;
@@ -52,9 +57,13 @@ public class LineMessageService {
             adminCardJsonCache = StreamUtils.copyToString(adminApprovalCardTemplate.getInputStream(), StandardCharsets.UTF_8);
             emergencyCardJsonCache = StreamUtils.copyToString(emergencyCardTemplate.getInputStream(), StandardCharsets.UTF_8);
             successCardJsonCache = StreamUtils.copyToString(successCardTemplate.getInputStream(), StandardCharsets.UTF_8);
-            log.info("✅ โหลด Flex Message Templates เข้าหน่วยความจำสำเร็จ (DDMobile)");
+
+            // 👇 เพิ่มบรรทัดนี้เข้าไป
+            welcomeCardJsonCache = StreamUtils.copyToString(welcomeCardTemplate.getInputStream(), StandardCharsets.UTF_8);
+
+            log.info("✅ โหลด Flex Message Templates เข้าหน่วยความจำสำเร็จ");
         } catch (Exception e) {
-            log.error("❌ ไม่สามารถโหลด Flex Message Templates ได้ (ตรวจเช็คชื่อไฟล์ในโฟลเดอร์ resources/flex/): ", e);
+            log.error("❌ ไม่สามารถโหลด Flex Message Templates ได้: ", e);
         }
     }
 
@@ -92,6 +101,24 @@ public class LineMessageService {
         } catch (Exception e) {
             log.error("❌ Error sendSuccessCard: ", e);
             sendTextMessage(toGroupId, "🎉 ลูกค้ายืนยันการผ่อนแล้ว!\nลูกค้า: " + customerName + "\nรายละเอียด: " + extraInfo);
+        }
+    }
+
+    /**
+     * 🌟 ส่งการ์ดต้อนรับ (Welcome Flex) เมื่อมีคนแอดเพื่อนใหม่
+     */
+    public void sendWelcomeCard(String toUserId) {
+        try {
+            // ในไฟล์ welcome_card.json เราไม่ได้ใส่ตัวแปร {{...}} ไว้ เลยสามารถดึง Cache มาส่งได้เลย
+            String finalJson = welcomeCardJsonCache;
+
+            // ส่งเป็น Push Message ไปหาลูกค้าแบบ 1-on-1 (toUserId)
+            executePushMessage(toUserId, "ยินดีต้อนรับสู่ ร้านทันใจ 🙏✨", finalJson);
+
+        } catch (Exception e) {
+            log.error("❌ Error sendWelcomeCard: ", e);
+            // Fallback ถ้ารูปพัง ให้ส่งเป็นข้อความธรรมดาแทน
+            sendTextMessage(toUserId, "สวัสดีครับคุณลูกค้า 🙏✨\nยินดีต้อนรับสู่ ร้านทันใจ ผ่อนง่ายใช้แค่บัตรประชาชนใบเดียว พิมพ์ 'สนใจผ่อน' เพื่อเริ่มทำรายการได้เลยครับ 👇");
         }
     }
 

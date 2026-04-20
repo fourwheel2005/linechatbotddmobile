@@ -64,40 +64,29 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         "👉 ลูกค้าใช้ไอโฟน **รุ่นไหน** ครับ? (เช่น 13 Pro Max, 15 Pro, 16)";
                 break;
 
-
+            // ══════════════════════════════════════════════════════════
             case "STEP_2_CAPACITY": // รับรุ่น → ถามความจุ
-                log.info("🤖 [รีบอลลูน] STEP_2 AI สกัดรุ่นจาก: {}", msg);
-
-                // 1. ให้ AI ลองสกัดดูก่อน
+                // ══════════════════════════════════════════════════════════
                 ExtractedData modelData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 String extractedModel = modelData.deviceModel();
 
-                // 2. 🛡️ ระบบ Fallback ดักจับตัวเลขรุ่นแบบเพียวๆ (กัน AI เอ๋อ)
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
-                    // ตรวจจับข้อความที่เริ่มต้นด้วยตัวเลข 11-17
-                    // และอาจจะตามด้วยคำว่า pro, max, plus, mini
                     if (msg.matches("^(1[1-7])(?:\\s*(pro|max|plus|mini|pm|p))?.*$")) {
-                        // ดึงเฉพาะตัวเลข 2 ตัวแรกออกมาเป็นชื่อรุ่นตั้งต้นก่อน
                         String baseModel = msg.substring(0, 2);
-
-                        // เติมรุ่นย่อย (ถ้ามี)
                         if (msg.contains("pro max") || msg.contains("pm")) extractedModel = baseModel + " Pro Max";
                         else if (msg.contains("pro") || msg.contains("p")) extractedModel = baseModel + " Pro";
                         else if (msg.contains("plus")) extractedModel = baseModel + " Plus";
                         else if (msg.contains("mini")) extractedModel = baseModel + " mini";
-                        else extractedModel = baseModel; // ถ้ามีแต่ตัวเลขเพียวๆ
-
-                        log.info("🛡️ [Fallback] จับชื่อรุ่นได้จาก Regex: {}", extractedModel);
+                        else extractedModel = baseModel;
                     }
                 }
 
-                // 3. ถ้ายังไม่ได้อีก ค่อยเด้งถามลูกค้าใหม่
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
-                    responseMessage = "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดรุ่นโทรศัพท์ไม่ได้", "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱");
                     break;
                 }
 
-
+                userState.setRetryCount(0); // ผ่านแล้วล้างแต้ม
                 userState.setDeviceModel(extractedModel);
                 userState.setCurrentState("STEP_3_PROVINCE");
                 responseMessage = "รับทราบครับ รุ่น **iPhone " + extractedModel + "** นะครับ! 📱\n" +
@@ -107,15 +96,15 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_3_PROVINCE": // รับความจุ → ถามจังหวัด
                 // ══════════════════════════════════════════════════════════
-                log.info("🤖 [รีบอลลูน] STEP_3 AI สกัดความจุจาก: {}", msg);
                 ExtractedData capData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 String extractedCapacity = capData.capacity();
 
                 if (extractedCapacity == null || "unknown".equalsIgnoreCase(extractedCapacity)) {
-                    responseMessage = "รบกวนระบุความจุอีกครั้งนะครับ 🙏 เช่น 128GB, 256GB ครับ";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดความจุไม่ได้", "รบกวนระบุความจุอีกครั้งนะครับ 🙏 เช่น 128GB, 256GB ครับ");
                     break;
                 }
 
+                userState.setRetryCount(0);
                 userState.setCapacity(extractedCapacity);
                 userState.setCurrentState("STEP_4_AGE");
                 responseMessage = "ความจุ **" + extractedCapacity + "** นะครับ! ✨\n" +
@@ -123,10 +112,21 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 break;
 
             // ══════════════════════════════════════════════════════════
-            case "STEP_4_AGE": // รับจังหวัด → ถามอายุ
+            case "STEP_4_AGE": // รับจังหวัด → ถามอายุ (อัปเดตสกัดจังหวัดแล้ว)
                 // ══════════════════════════════════════════════════════════
+                ExtractedData provData = aiDataExtractorService.extractInfo(msg, lastMessage);
+                String extractedProvince = provData.province();
+
+                if (extractedProvince == null || "unknown".equalsIgnoreCase(extractedProvince)) {
+                    responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดชื่อจังหวัดไม่ได้", "รบกวนแจ้งจังหวัดที่ลูกค้าอยู่ให้น้องทันใจอีกครั้งนะครับ 📍 (เช่น ชลบุรี, กรุงเทพ)");
+                    break;
+                }
+
+                userState.setRetryCount(0);
+                userState.setProvince(extractedProvince); // บันทึกจังหวัดลงฐานข้อมูล
                 userState.setCurrentState("STEP_5_REPAIR");
-                responseMessage = "โอเคครับ 📍 แล้วลูกค้า **อายุ** เท่าไหร่ครับ?";
+                responseMessage = "จังหวัด " + extractedProvince + " รับทราบครับ 📍\n" +
+                        "👉 แล้วลูกค้า **อายุ** เท่าไหร่ครับ?";
                 break;
 
             // ══════════════════════════════════════════════════════════
@@ -140,26 +140,25 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 }
 
                 if (extractedAge == null || extractedAge == 0) {
-                    responseMessage = "รบกวนระบุตัวเลขอายุให้น้องทันใจหน่อยนะครับ (เช่น 25)";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดอายุไม่ได้", "รบกวนระบุตัวเลขอายุให้น้องทันใจหน่อยนะครับ (เช่น 25)");
                     break;
                 }
 
                 if (extractedAge < 18) {
                     userState.setCurrentState("ADMIN_MODE");
-                    // เปลี่ยนเป็น 👇
-                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุต่ำกว่าเกณฑ์: " + extractedAge + " ปี — แนะนำให้ผู้ปกครองเป็นคนดำเนินการแทน");
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุต่ำกว่าเกณฑ์: " + extractedAge + " ปี");
                     responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
                     break;
                 }
 
                 if (extractedAge > 55) {
                     userState.setCurrentState("ADMIN_MODE");
-                    // เปลี่ยนเป็น 👇
-                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุเกินเกณฑ์: " + extractedAge + " ปี — กรุณาพิจารณาจากงาน / Statement / เงินเดือนของลูกค้าครับ");
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุเกินเกณฑ์: " + extractedAge + " ปี");
                     responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
                     break;
                 }
 
+                userState.setRetryCount(0);
                 userState.setCurrentState("STEP_6_FACEID");
                 responseMessage = "อายุ " + extractedAge + " ปี รับทราบครับ 👍\n\n" +
                         "ถัดไปน้องทันใจขอเช็คประวัติเครื่องหน่อยครับ 🔍\n" +
@@ -176,9 +175,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
                 if (repairAns == ScreeningAnswer.UNCLEAR) {
-                    responseMessage = "รบกวนตอบให้น้องทันใจชัดเจนอีกนิดครับ เช่น 'ไม่เคยแกะเลยครับ' หรือ 'เคยเปลี่ยนแบตครับ'";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าตอบประวัติการซ่อมไม่ชัดเจน", "รบกวนตอบให้น้องทันใจชัดเจนอีกนิดครับ เช่น 'ไม่เคยแกะเลยครับ' หรือ 'เคยเปลี่ยนแบตครับ'");
                     break;
                 }
+
+                userState.setRetryCount(0);
                 userState.setCurrentState("STEP_7_INSTALLMENT");
                 responseMessage = "โอเคครับ 👍 แล้ว **Face ID (สแกนหน้า)** ใช้งานได้ปกติไหมครับ?";
                 break;
@@ -193,17 +194,17 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
                 if (faceIdAns == ScreeningAnswer.UNCLEAR) {
-                    responseMessage = "รบกวนตอบให้น้องทันใจทราบชัดๆ นิดนึงครับ เช่น 'ปกติครับ' หรือ 'สแกนไม่ได้ค่ะ'";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าตอบเรื่อง Face ID ไม่ชัดเจน", "รบกวนตอบให้น้องทันใจทราบชัดๆ นิดนึงครับ เช่น 'ปกติครับ' หรือ 'สแกนไม่ได้ค่ะ'");
                     break;
                 }
 
-                // ✅ ส่งไป STEP_8_DEVICE_PHOTOS เพื่อรอรับคำตอบเรื่องติดผ่อน
+                userState.setRetryCount(0);
                 userState.setCurrentState("STEP_8_DEVICE_PHOTOS");
                 responseMessage = "เยี่ยมเลยครับ 😊 แล้วเครื่องมี **ติดผ่อนกับร้านอื่น หรือติดใส่ iCloud ร้านอื่น** ไหมครับ?";
                 break;
 
             // ══════════════════════════════════════════════════════════
-            case "STEP_8_DEVICE_PHOTOS": // ตรวจติดผ่อน → ขอรูปรอบเครื่อง 4-5 รูป
+            case "STEP_8_DEVICE_PHOTOS": // ตรวจติดผ่อน → ขอรูปรอบเครื่อง
                 // ══════════════════════════════════════════════════════════
                 ScreeningAnswer installAns = aiScreeningService.interpret(msg, lastMessage);
                 if (installAns == ScreeningAnswer.YES) {
@@ -212,11 +213,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
                 if (installAns == ScreeningAnswer.UNCLEAR) {
-                    responseMessage = "รบกวนยืนยันใหม่อีกครั้งครับ เช่น 'ไม่ติดผ่อนครับ'";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าตอบเรื่องติดผ่อนไม่ชัดเจน", "รบกวนยืนยันใหม่อีกครั้งครับ เช่น 'ไม่ติดผ่อนครับ' หรือ 'เครื่องเปล่าครับ'");
                     break;
                 }
 
-                // ✅ ส่งไป STEP_9_SETTINGS_PHOTO เพื่อรอรับรูป 4-5 รูป (Hybrid Approach)
+                userState.setRetryCount(0);
                 userState.setCurrentState("STEP_9_SETTINGS_PHOTO");
                 responseMessage = "ผ่านการตรวจสอบเบื้องต้นเรียบร้อยครับ 🎉✅\n\n" +
                         "เพื่อให้แอดมินประเมินสภาพภายนอกได้ชัดเจน รบกวนลูกค้า:\n" +
@@ -232,22 +233,17 @@ public class BalloonFlowService implements ServiceFlowHandler {
                             "(หากส่งครบแล้ว รบกวนพิมพ์บอกแอดมินว่า **'ครบแล้ว'** ด้วยนะครับ ✨)";
                 }
 
-                boolean isImageBatchReceived = msg.contains("ครบ") ||
-                        msg.contains("ส่งแล้ว") ||
-                        msg.contains("เรียบร้อย");
+                boolean isImageBatchReceived = msg.contains("ครบ") || msg.contains("ส่งแล้ว") || msg.contains("เรียบร้อย");
 
                 if (!isImageBatchReceived) {
-                    return "น้องทันใจกำลังรอรูปรอบเครื่องอยู่นะครับ 📸 ทยอยส่งมาได้เลยครับ\n" +
-                            "(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)";
+                    return handleRetryLogic(userState, userId, msg, "ลูกค้าพิมพ์ข้อความอื่นแทนที่จะส่งรูปครบแล้ว", "น้องทันใจกำลังรอรูปรอบเครื่องอยู่นะครับ 📸\n(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)");
                 }
 
-                // ✅ ถ้ารับคำว่า 'ครบแล้ว' จริงๆ -> เปลี่ยน State เป็นรอแอดมินตรวจรูป
+                userState.setRetryCount(0);
                 userState.setCurrentState("ADMIN_PHOTO_CHECK");
-                userState.setLastUserMessage(msg); // เพิ่มด้วย
-                userStateRepository.save(userState); // ← เพิ่มบรรทัดนี้
+                userState.setLastUserMessage(msg);
+                userStateRepository.save(userState);
 
-
-                // ส่งการ์ดให้แอดมิน (ใช้ชื่อ LINE ไปก่อนเพราะยังไม่ได้ขอชื่อจริง)
                 lineMessageService.sendAdminApprovalCard(
                         ADMIN_GROUP_ID,
                         "ตรวจสภาพเครื่อง (รีบอลลูน)",
@@ -260,16 +256,13 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 return "ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอเวลาตรวจสอบสภาพภายนอกสักครู่นะครับ รบกวนรอสักครู่ครับ ⏳";
 
             // ══════════════════════════════════════════════════════════
-            case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ -> บอทส่งข้อความขอรูปแคปหน้าจอ
+            case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
                 userStateRepository.save(userState);
                 String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
-
-                // บอทยิงรูปภาพตัวอย่างไปก่อน
                 lineMessageService.sendImage(userId, exampleImageUrl);
 
-                // ตามด้วยข้อความบอกให้แคปหน้าจอส่งมา
                 return "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
                         "ถัดไป รบกวนลูกค้า **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'**\n" +
                         "ส่งมาให้แอดมินดูรุ่นและความจุที่แน่นอนหน่อยครับ\n" +
@@ -278,12 +271,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_10_NAME": // รับรูปหน้าตั้งค่า → ขอชื่อ
                 // ══════════════════════════════════════════════════════════
-                // 🛡️ บังคับว่าต้องส่งเป็นรูปภาพเท่านั้น
                 if (!msg.equals("[รูปภาพ]")) {
-                    return "น้องทันใจกำลังรอรูปแคปหน้าจอตั้งค่าอยู่นะครับ 📸 รบกวนลูกค้าส่งเป็นรูปภาพเข้ามาให้หน่อยนะครับ 🙏";
+                    return handleRetryLogic(userState, userId, msg, "ลูกค้าไม่ยอมส่งรูปหน้าตั้งค่า", "น้องทันใจกำลังรอรูปแคปหน้าจอตั้งค่าอยู่นะครับ 📸 รบกวนลูกค้าส่งเป็นรูปภาพเข้ามาให้หน่อยนะครับ 🙏");
                 }
 
-                // ✅ รับรูปแล้ว ส่งไป STEP 11 เพื่อรอรับชื่อ
+                userState.setRetryCount(0);
                 userState.setCurrentState("STEP_11_SUBMIT_DATA");
                 responseMessage = "ได้รับข้อมูลครบถ้วนครับ 📸📱\n\n" +
                         "👉 ขั้นตอนสุดท้าย รบกวนลูกค้าพิมพ์ **ชื่อ-นามสกุล** ส่งมาให้แอดมินเพื่อใช้ในการประเมินเครดิตด้วยครับ ✍️";
@@ -304,9 +296,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 break;
 
             // ══════════════════════════════════════════════════════════
-            // Admin-triggered states (ชื่อคงเดิม ไม่แตะ)
-            // ══════════════════════════════════════════════════════════
             case "STEP_5_PRICING":
+                // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_6_MONTH_SELECTION");
                 BalloonPrice price = getPriceForModel(userState.getDeviceModel());
                 if (price == null) {
@@ -325,11 +316,12 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_6_MONTH_SELECTION":
                 boolean isValidMonth = msg.matches(".*(6|8|10|12|หก|แปด|สิบ).*");
                 if (!isValidMonth) {
-                    responseMessage = "ลูกค้าสะดวกส่งงวดละกี่เดือนดีครับ? 😊\nมีให้เลือก: **6, 8, 10 หรือ 12 เดือน** ครับ";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าเลือกระยะเวลาผ่อนผิด", "ลูกค้าสะดวกส่งงวดละกี่เดือนดีครับ? 😊\nมีให้เลือก: **6, 8, 10 หรือ 12 เดือน** ครับ");
                     break;
                 }
-                userState.setCurrentState("ADMIN_MODE");
 
+                userState.setRetryCount(0);
+                userState.setCurrentState("ADMIN_MODE");
                 lineMessageService.sendSuccessCard(
                         ADMIN_GROUP_ID,
                         "รีบอลลูน",
@@ -359,6 +351,36 @@ public class BalloonFlowService implements ServiceFlowHandler {
         userStateRepository.save(userState);
 
         return responseMessage;
+    }
+
+    // ==========================================
+    // 🛠️ Helper Method: ระบบจัดการคนพิมพ์มั่ว (Retry Logic)
+    // ==========================================
+    private String handleRetryLogic(UserState userState, String userId, String msg, String adminAlertReason, String retryPrompt) {
+        int currentRetry = userState.getRetryCount() != null ? userState.getRetryCount() : 0;
+        currentRetry++;
+
+        if (currentRetry >= 2) { // 🚨 ถ้าผิดครบ 2 ครั้ง โยนเข้าโหมดแอดมินทันที
+            userState.setPreviousState(userState.getCurrentState());
+            userState.setCurrentState("ADMIN_MODE");
+            userState.setRetryCount(0); // ล้างค่าทิ้งเพื่อรอรอบใหม่
+            userStateRepository.save(userState);
+
+            lineMessageService.sendEmergencyCard(
+                    ADMIN_GROUP_ID,
+                    getServiceName(),
+                    "balloon",
+                    getCustomerName(userId),
+                    userId,
+                    adminAlertReason + " เกิน 2 ครั้ง (ข้อความล่าสุด: " + msg + ")"
+            );
+
+            return "น้องทันใจดูเหมือนจะยังไม่เข้าใจข้อมูลส่วนนี้ 😅 เพื่อความรวดเร็ว น้องขอตามแอดมินตัวจริงมาช่วยดูแลเคสนี้ให้นะครับ รบกวนรอสักครู่ครับ ⏳";
+        }
+
+        // ถ้ายิ่งไม่ครบ 2 ครั้ง ให้บันทึกแต้มสะสม และถามคำถามเดิมซ้ำ
+        userState.setRetryCount(currentRetry);
+        return retryPrompt;
     }
 
     private String getCustomerName(String userId) {

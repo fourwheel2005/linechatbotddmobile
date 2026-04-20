@@ -1,0 +1,58 @@
+{
+  "type": "bubble",
+  "hero": {
+    "type": "image",
+    "url": "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg",
+    "size": "full",
+    "aspectRatio": "20:13",
+    "aspectMode": "cover"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "สวัสดีครับคุณลูกค้า 🙏✨",
+        "weight": "bold",
+        "size": "xl"
+      },
+      {
+        "type": "text",
+        "text": "ยินดีต้อนรับสู่ ร้านทันใจ ผ่อนง่ายใช้แค่บัตรประชาชนใบเดียว ไม่เช็คบูโรครับ เลือกทำรายการด้านล่างได้เลยครับ 👇",
+        "wrap": true,
+        "color": "#666666",
+        "size": "sm",
+        "margin": "md"
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "spacing": "sm",
+    "contents": [
+      {
+        "type": "button",
+        "style": "primary",
+        "height": "sm",
+        "action": {
+          "type": "message",
+          "label": "📱 สนใจผ่อนโทรศัพท์",
+          "text": "สนใจผ่อน"
+        },
+        "color": "#00B900"
+      },
+      {
+        "type": "button",
+        "style": "secondary",
+        "height": "sm",
+        "action": {
+          "type": "message",
+          "label": "📞 ติดต่อแอดมิน (คุยกับคน)",
+          "text": "ติดต่อแอดมิน"
+        }
+      }
+    ]
+  }
+}
