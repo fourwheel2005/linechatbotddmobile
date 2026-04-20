@@ -46,14 +46,15 @@ public class AiDataExtractorService {
             return new ExtractedData(
                     result.deviceModel() != null && !result.deviceModel().isEmpty() ? result.deviceModel() : "unknown",
                     result.age() != null ? result.age() : 0,
-                    result.capacity() != null && !result.capacity().isEmpty() ? result.capacity() : "unknown"
+                    result.capacity() != null && !result.capacity().isEmpty() ? result.capacity() : "unknown",
+                    result.province() != null && !result.province().isEmpty() ? result.province() : "unknown"
             );
 
 // ✅ จุดที่ 2 — fallback ลำดับเดียวกัน
         } catch (Exception e) {
             log.error("❌ [Extractor] ทำงานล้มเหลว: ", e);
             // ✅ เพิ่ม capacity ใน fallback (จุดที่ 2)
-            return new ExtractedData("unknown", 0, "unknown");
+            return new ExtractedData("unknown", 0, "unknown","unknown");
         }
     }
 }
