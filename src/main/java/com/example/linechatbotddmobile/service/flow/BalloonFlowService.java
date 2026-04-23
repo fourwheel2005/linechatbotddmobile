@@ -90,7 +90,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 userState.setDeviceModel(extractedModel);
                 userState.setCurrentState("STEP_3_PROVINCE");
                 responseMessage = "รับทราบครับ รุ่น **iPhone " + extractedModel + "** นะครับ! 📱\n" +
-                        "👉 สนใจความจุ **กี่ GB** ครับผม? (เช่น 128, 256, 512)";
+                        "👉 ความจุ **กี่ GB** ครับผม? (เช่น 128, 256, 512)";
                 break;
 
             // ══════════════════════════════════════════════════════════
