@@ -33,7 +33,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
     }
 
     @Override
-    public String getServiceName() { return "รีบอลลูน"; }
+    public String getServiceName() { return "ผ่อนบอลลูน"; }
 
     @Override
     public String processMessage(UserState userState, String userMessage) {

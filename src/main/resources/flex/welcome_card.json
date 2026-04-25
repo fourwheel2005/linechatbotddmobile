@@ -2,7 +2,7 @@
   "type": "bubble",
   "hero": {
     "type": "image",
-    "url": "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg",
+    "url": "https://raw.githubusercontent.com/fourwheel2005/image/main/ทันใจทันใช้logo.png.jpg",
     "size": "full",
     "aspectRatio": "20:13",
     "aspectMode": "cover"
@@ -42,17 +42,8 @@
           "text": "สนใจผ่อนบอลลูน"
         },
         "color": "#00B900"
-      },
-      {
-        "type": "button",
-        "style": "secondary",
-        "height": "sm",
-        "action": {
-          "type": "message",
-          "label": "📞 ติดต่อแอดมิน (คุยกับคน)",
-          "text": "ติดต่อแอดมิน"
-        }
       }
+
     ]
   }
 }
