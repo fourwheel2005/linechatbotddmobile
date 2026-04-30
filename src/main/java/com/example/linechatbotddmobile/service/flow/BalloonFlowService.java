@@ -252,32 +252,33 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 userState.setRetryCount(0);
                 userState.setCurrentState("ADMIN_PHOTO_CHECK");
-                userState.setLastUserMessage(msg);
-                userStateRepository.save(userState);
 
                 lineMessageService.sendAdminApprovalCard(
                         ADMIN_GROUP_ID,
-                        "ตรวจสภาพเครื่อง" + getServiceName(),
+                        "ตรวจสภาพเครื่อง (" + getServiceName() + ")", // เติมวงเล็บให้ข้อความดูสวยขึ้น
                         "balloon",
                         getCustomerName(userId),
                         userId,
                         "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity() + "\n(แอดมินโปรดตรวจรูปรอบเครื่อง 4-5 รูป)"
                 );
 
-                return "ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอเวลาตรวจสอบสภาพภายนอกสักครู่นะครับ รบกวนรอสักครู่ครับ ⏳";
+                responseMessage = "ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอเวลาตรวจสอบสภาพภายนอกสักครู่นะครับ รบกวนรอสักครู่ครับ ⏳";
+                break;
+
 
             // ══════════════════════════════════════════════════════════
             case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
-                userStateRepository.save(userState);
+
                 String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
                 lineMessageService.sendImage(userId, exampleImageUrl);
 
-                return "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
+                responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
                         "ถัดไป รบกวนลูกค้า **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'**\n" +
                         "ส่งมาให้แอดมินดูรุ่นและความจุที่แน่นอนหน่อยครับ\n" +
                         "(ตามรูปตัวอย่างที่แอดมินส่งให้ด้านบนเลยครับ ☝️)";
+                break;
 
             // ══════════════════════════════════════════════════════════
             case "STEP_10_NAME": // รับรูปหน้าตั้งค่า → ขอชื่อ
