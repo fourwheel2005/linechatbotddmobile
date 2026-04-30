@@ -257,7 +257,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 lineMessageService.sendAdminApprovalCard(
                         ADMIN_GROUP_ID,
-                        "ตรวจสภาพเครื่อง (รีบอลลูน)",
+                        "ตรวจสภาพเครื่อง" + getServiceName(),
                         "balloon",
                         getCustomerName(userId),
                         userId,
@@ -299,7 +299,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 userState.setCurrentState("ADMIN_MODE");
                 userState.setFullName(msg);
                 lineMessageService.sendAdminApprovalCard(
-                        ADMIN_GROUP_ID, "รีบอลลูน", "balloon",
+                        ADMIN_GROUP_ID, getServiceName(), "balloon",
                         msg + " (LINE: " + getCustomerName(userId) + ")",
                         userId,
                         "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity()
@@ -336,7 +336,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 userState.setCurrentState("ADMIN_MODE");
                 lineMessageService.sendSuccessCard(
                         ADMIN_GROUP_ID,
-                        "รีบอลลูน",
+                        getServiceName(),
                         "balloon",
                         getCustomerName(userId),
                         userId,
