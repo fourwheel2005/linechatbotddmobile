@@ -29,7 +29,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
     @Override
     public boolean supports(String serviceName) {
-        return "รีบอลลูน".equals(serviceName);
+        return "ผ่อนบอลลูน".equals(serviceName);
     }
 
     @Override
@@ -238,14 +238,16 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_9_SETTINGS_PHOTO": // รับรูปรอบเครื่อง → ส่ง Flex ให้แอดมินตรวจ
                 // ══════════════════════════════════════════════════════════
                 if (msg.equals("[รูปภาพ]")) {
-                    return "น้องทันใจได้รับรูปแล้วครับ 📸 ทยอยส่งมาให้ครบ 4-5 รูปได้เลยนะครับ\n" +
+                    responseMessage =  "น้องทันใจได้รับรูปแล้วครับ 📸 ทยอยส่งมาให้ครบ 4-5 รูปได้เลยนะครับ\n" +
                             "(หากส่งครบแล้ว รบกวนพิมพ์บอกแอดมินว่า **'ครบแล้ว'** ด้วยนะครับ ✨)";
+                    break;
                 }
 
                 boolean isImageBatchReceived = msg.contains("ครบ") || msg.contains("ส่งแล้ว") || msg.contains("เรียบร้อย");
 
                 if (!isImageBatchReceived) {
-                    return handleRetryLogic(userState, userId, msg, "ลูกค้าพิมพ์ข้อความอื่นแทนที่จะส่งรูปครบแล้ว", "น้องทันใจกำลังรอรูปรอบเครื่องอยู่นะครับ 📸\n(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)");
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าพิมพ์ข้อความอื่นแทนที่จะส่งรูปครบแล้ว", "น้องทันใจกำลังรอรูปรอบเครื่องอยู่นะครับ 📸\n(หากส่งรูปครบแล้ว พิมพ์บอกแอดมินว่า **'ครบแล้ว'** ได้เลยครับ ✨)");
+                    break;
                 }
 
                 userState.setRetryCount(0);
@@ -281,7 +283,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_10_NAME": // รับรูปหน้าตั้งค่า → ขอชื่อ
                 // ══════════════════════════════════════════════════════════
                 if (!msg.equals("[รูปภาพ]")) {
-                    return handleRetryLogic(userState, userId, msg, "ลูกค้าไม่ยอมส่งรูปหน้าตั้งค่า", "น้องทันใจกำลังรอรูปแคปหน้าจอตั้งค่าอยู่นะครับ 📸 รบกวนลูกค้าส่งเป็นรูปภาพเข้ามาให้หน่อยนะครับ 🙏");
+                    responseMessage =  handleRetryLogic(userState, userId, msg, "ลูกค้าไม่ยอมส่งรูปหน้าตั้งค่า", "น้องทันใจกำลังรอรูปแคปหน้าจอตั้งค่าอยู่นะครับ 📸 รบกวนลูกค้าส่งเป็นรูปภาพเข้ามาให้หน่อยนะครับ 🙏");
+                    break;
                 }
 
                 userState.setRetryCount(0);
