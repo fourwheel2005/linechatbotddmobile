@@ -52,7 +52,7 @@ public class ChatFlowManager {
 
         if (isInterest && !isReject && userState.getCurrentState() == null) {
             userState.setCurrentState("STEP_1_INFO");
-            userState.setServiceName("สนใจผ่อนบอลลูน");
+            userState.setServiceName("ผ่อนบอลลูน");
             userStateRepository.save(userState);
         }
 
