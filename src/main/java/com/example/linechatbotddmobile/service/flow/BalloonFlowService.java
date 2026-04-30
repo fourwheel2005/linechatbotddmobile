@@ -170,8 +170,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 ScreeningAnswer repairAns = aiScreeningService.interpret(msg, lastMessage);
                 if (repairAns == ScreeningAnswer.YES) {
-                    userState.setCurrentState("REJECTED");
-                    responseMessage = "ต้องขออภัยด้วยนะครับ 🙏 ทางร้านขอสงวนสิทธิ์ไม่รับเครื่องที่ผ่านการแกะซ่อมครับ หากมีข้อสงสัยพิมพ์หาแอดมินได้เลยครับ";
+                    userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
+                    userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
+
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่าเครื่องเคยแกะซ่อม (ประเมินโดย AI)\nข้อความ: " + msg);
+                    responseMessage = "ขอบคุณสำหรับข้อมูลนะครับ 🙏 แอดมินได้รับเรื่องแล้ว รบกวนรอแอดมินเข้ามาตรวจสอบรายละเอียดประวัติการซ่อมสักครู่นะครับ ⏳";
                     break;
                 }
                 if (repairAns == ScreeningAnswer.UNCLEAR) {
@@ -189,8 +192,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 ScreeningAnswer faceIdAns = aiScreeningService.interpret(msg, lastMessage);
                 if (faceIdAns == ScreeningAnswer.NO) {
-                    userState.setCurrentState("REJECTED");
-                    responseMessage = "ต้องขออภัยด้วยนะครับ 🙏 ทางร้านไม่สามารถรับเครื่องที่สแกนหน้าไม่ได้ครับ";
+                    userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
+                    userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
+
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่า Face ID ใช้งานไม่ได้ (ประเมินโดย AI)\nข้อความ: " + msg);
+                    responseMessage = "รับทราบครับ 🙏 แอดมินได้รับเรื่องแล้ว รบกวนรอแอดมินเข้ามาตรวจสอบรายละเอียดสักครู่นะครับ ⏳";
                     break;
                 }
                 if (faceIdAns == ScreeningAnswer.UNCLEAR) {
@@ -208,8 +214,11 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 ScreeningAnswer installAns = aiScreeningService.interpret(msg, lastMessage);
                 if (installAns == ScreeningAnswer.YES) {
-                    userState.setCurrentState("REJECTED");
-                    responseMessage = "ต้องขออภัยครับ 🙏 น้องทันใจไม่สามารถรับเครื่องที่ยังติดภาระผ่อนหรือล็อค iCloud ครับ";
+                    userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
+                    userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
+
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่าเครื่องติดผ่อน/ติด iCloud (ประเมินโดย AI)\nข้อความ: " + msg);
+                    responseMessage = "ขอบคุณสำหรับข้อมูลครับ 🙏 แอดมินได้รับเรื่องแล้ว เดี๋ยวจะเข้ามาดูแลเคสนี้ให้นะครับ รบกวนรอสักครู่ครับ ⏳";
                     break;
                 }
                 if (installAns == ScreeningAnswer.UNCLEAR) {
