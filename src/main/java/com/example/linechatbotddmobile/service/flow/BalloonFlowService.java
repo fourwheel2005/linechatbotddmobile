@@ -12,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -49,7 +52,12 @@ public class BalloonFlowService implements ServiceFlowHandler {
             userState.setLastUserMessage(msg);
             userStateRepository.save(userState);
             lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
-            return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
+
+            if (isBusinessHours()) {
+                return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";
+            } else {
+                return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 แต่ตอนนี้อยู่นอกเวลาทำการ (เปิด 08:30 - 19:00 น.) พรุ่งนี้เช้าแอดมินตัวจริงจะรีบมาดูแลเคสนี้ให้นะครับ ⏳💤";
+            }
         }
 
         String responseMessage = null;
@@ -147,14 +155,14 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 if (extractedAge < 18) {
                     userState.setCurrentState("ADMIN_MODE");
                     lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุต่ำกว่าเกณฑ์: " + extractedAge + " ปี");
-                    responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
+                    responseMessage = getWaitMessage("ขอบคุณที่แจ้งนะครับ 🙏 เกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** แอดมินได้รับเรื่องไว้แล้วครับ");
                     break;
                 }
 
                 if (extractedAge > 55) {
                     userState.setCurrentState("ADMIN_MODE");
                     lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าอายุเกินเกณฑ์: " + extractedAge + " ปี");
-                    responseMessage = "ขอบคุณที่แจ้งนะครับ 🙏\n\nเกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** รบกวนลูกค้ารอแอดมินมาพิจารณาสักครู่นะครับ ⏳";
+                    responseMessage = getWaitMessage("ขอบคุณที่แจ้งนะครับ 🙏 เกณฑ์อายุที่กำหนดอยู่ที่ **18 - 55 ปี** แอดมินได้รับเรื่องไว้แล้วครับ");
                     break;
                 }
 
@@ -174,7 +182,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
 
                     lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่าเครื่องเคยแกะซ่อม (ประเมินโดย AI)\nข้อความ: " + msg);
-                    responseMessage = "ขอบคุณสำหรับข้อมูลนะครับ 🙏 แอดมินได้รับเรื่องแล้ว รบกวนรอแอดมินเข้ามาตรวจสอบรายละเอียดประวัติการซ่อมสักครู่นะครับ ⏳";
+                    responseMessage = getWaitMessage("ขอบคุณสำหรับข้อมูลนะครับ 🙏 แอดมินได้รับเรื่องประวัติการซ่อมแล้ว");
                     break;
                 }
                 if (repairAns == ScreeningAnswer.UNCLEAR) {
@@ -196,7 +204,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
 
                     lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่า Face ID ใช้งานไม่ได้ (ประเมินโดย AI)\nข้อความ: " + msg);
-                    responseMessage = "รับทราบครับ 🙏 แอดมินได้รับเรื่องแล้ว รบกวนรอแอดมินเข้ามาตรวจสอบรายละเอียดสักครู่นะครับ ⏳";
+                    responseMessage = getWaitMessage("รับทราบครับ 🙏 แอดมินได้รับเรื่องการสแกนหน้าแล้ว");
                     break;
                 }
                 if (faceIdAns == ScreeningAnswer.UNCLEAR) {
@@ -218,7 +226,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
 
                     lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "⚠️ ลูกค้าแจ้งว่าเครื่องติดผ่อน/ติด iCloud (ประเมินโดย AI)\nข้อความ: " + msg);
-                    responseMessage = "ขอบคุณสำหรับข้อมูลครับ 🙏 แอดมินได้รับเรื่องแล้ว เดี๋ยวจะเข้ามาดูแลเคสนี้ให้นะครับ รบกวนรอสักครู่ครับ ⏳";
+                    responseMessage = getWaitMessage("ขอบคุณสำหรับข้อมูลครับ 🙏 แอดมินได้รับเรื่องตรวจสอบการติดผ่อนแล้ว");
                     break;
                 }
                 if (installAns == ScreeningAnswer.UNCLEAR) {
@@ -262,7 +270,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity() + "\n(แอดมินโปรดตรวจรูปรอบเครื่อง 4-5 รูป)"
                 );
 
-                responseMessage = "ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอเวลาตรวจสอบสภาพภายนอกสักครู่นะครับ รบกวนรอสักครู่ครับ ⏳";
+                responseMessage = getWaitMessage("ได้รับรูปรอบเครื่องเรียบร้อยครับ 📸 แอดมินขอรับเรื่องตรวจสอบสภาพภายนอกไว้ครับ");
                 break;
 
 
@@ -305,7 +313,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         userId,
                         "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity()
                 );
-                responseMessage = "ได้รับข้อมูลครบถ้วนครับ 📝 น้องทันใจส่งเรื่องให้แอดมินตรวจสอบราคาประเมินและเครดิตให้แล้วครับ รบกวนรอสักครู่นะครับ ⏳";
+                // ลบ if-else อันเก่าออก แล้วใช้บรรทัดนี้แทน
+                responseMessage = getWaitMessage("ได้รับข้อมูลครบถ้วนครับ 📝 น้องทันใจส่งเรื่องให้แอดมินตรวจสอบราคาประเมินและเครดิตให้แล้วครับ");
                 break;
 
             // ══════════════════════════════════════════════════════════
@@ -314,7 +323,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 userState.setCurrentState("STEP_6_MONTH_SELECTION");
                 BalloonPrice price = getPriceForModel(userState.getDeviceModel());
                 if (price == null) {
-                    responseMessage = "สำหรับรุ่นนี้ รบกวนรอแอดมินเข้ามาเสนอราคาพิเศษให้นะครับ ⏳";
+                    responseMessage = getWaitMessage("สำหรับรุ่นนี้ แอดมินได้รับเรื่องเพื่อเตรียมเสนอราคาพิเศษให้แล้วครับ");
                     break;
                 }
                 responseMessage = "ข้อเสนอสำหรับ **iPhone " + userState.getDeviceModel() + "** มาแล้วครับ! 🎉\n" +
@@ -343,7 +352,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         userId,
                         "ลูกค้าเลือกระยะเวลา: " + msg + " เดือน"
                 );
-                responseMessage = "รับทราบครับ! น้องทันใจได้รับข้อมูลแล้ว 📝\nเดี๋ยวแอดมินจะเข้ามาสรุปยอด แจ้งเงื่อนไข และขอเอกสารทำสัญญาให้นะครับ รบกวนรอสักครู่ครับ ⏳";
+                responseMessage = getWaitMessage("รับทราบครับ! น้องทันใจได้รับข้อมูลแล้ว 📝 แอดมินจะเข้ามาสรุปยอด แจ้งเงื่อนไข และขอเอกสารทำสัญญาให้นะครับ");
                 break;
 
             case "ADMIN_MODE":
@@ -388,7 +397,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     adminAlertReason + " เกิน 2 ครั้ง (ข้อความล่าสุด: " + msg + ")"
             );
 
-            return "น้องทันใจดูเหมือนจะยังไม่เข้าใจข้อมูลส่วนนี้ 😅 เพื่อความรวดเร็ว น้องขอตามแอดมินตัวจริงมาช่วยดูแลเคสนี้ให้นะครับ รบกวนรอสักครู่ครับ ⏳";
+            // ก่อนบรรทัด return ใน if (currentRetry >= 2)
+            return getWaitMessage("น้องทันใจดูเหมือนจะยังไม่เข้าใจข้อมูลส่วนนี้ 😅 เพื่อความรวดเร็ว น้องขอส่งเรื่องให้แอดมินมาช่วยดูแลเคสนี้ให้นะครับ");
         }
 
         // ถ้ายิ่งไม่ครบ 2 ครั้ง ให้บันทึกแต้มสะสม และถามคำถามเดิมซ้ำ
@@ -430,5 +440,31 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "17 pro max" -> new BalloonPrice(25000, 7990, 6290, 5390, 4790);
             default -> null;
         };
+    }
+
+
+    private boolean isBusinessHours() {
+        // เวลาปัจจุบันในประเทศไทย
+        LocalTime now = LocalTime.now(ZoneId.of("Asia/Bangkok"));
+
+        // 🔴 ตั้งเวลาเปิดร้าน (08:30 น.)
+        LocalTime openTime = LocalTime.of(8, 30);
+
+        // 🔴 ตั้งเวลาปิดร้าน (19:00 น.)
+        LocalTime closeTime = LocalTime.of(19, 0);
+
+        // คืนค่า true ถ้าร้านเปิดอยู่
+        return !now.isBefore(openTime) && !now.isAfter(closeTime);
+    }
+
+    // ==========================================
+    // 🛠️ Helper Method: จัดการข้อความรอแอดมิน (แยกกลางวัน-กลางคืน)
+    // ==========================================
+    private String getWaitMessage(String prefixText) {
+        if (isBusinessHours()) {
+            return prefixText + " รบกวนรอสักครู่นะครับ ⏳";
+        } else {
+            return prefixText + "\n\nแต่ตอนนี้นอกเวลาทำการแล้ว (เปิด 08:30 - 19:00 น.) พรุ่งนี้เช้าเวลา 08:30 น. แอดมินจะรีบเข้ามาดูแลให้เป็นคิวแรกเลยนะครับ 🙏💤";
+        }
     }
 }
