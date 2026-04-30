@@ -68,7 +68,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_1_INFO": // เริ่มต้น → ถามรุ่น
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_2_CAPACITY");
-                responseMessage = "สวัสดีครับ 🙏😊 น้องทันใจยินดีให้บริการรีบอลลูนครับ ขออนุญาตสอบถามข้อมูลเบื้องต้นนะครับ\n" +
+                responseMessage = "สวัสดีครับ 🙏😊 น้องทันใจยินดีให้บริการผ่อนบอลลูนครับ ขออนุญาตสอบถามข้อมูลเบื้องต้นนะครับ\n" +
                         "👉 ลูกค้าใช้ไอโฟน **รุ่นไหน** ครับ? (เช่น 13 Pro Max, 15 Pro, 16)";
                 break;
 
@@ -363,7 +363,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
             default:
                 userState.setCurrentState("STEP_1_INFO");
-                responseMessage = "ระบบเริ่มการทำรายการใหม่ครับ กรุณาพิมพ์คำว่า 'รีบอลลูน' เพื่อเริ่มดำเนินการครับ";
+                responseMessage = "ระบบเริ่มการทำรายการใหม่ครับ กรุณาพิมพ์คำว่า 'ผ่อนบอลลูน' เพื่อเริ่มดำเนินการครับ";
                 break;
         }
 

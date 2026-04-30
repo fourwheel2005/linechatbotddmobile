@@ -52,7 +52,7 @@ public class ChatFlowManager {
 
         if (isInterest && !isReject && userState.getCurrentState() == null) {
             userState.setCurrentState("STEP_1_INFO");
-            userState.setServiceName("รีบอลลูน");
+            userState.setServiceName("ผ่อนบอลลูน");
             userStateRepository.save(userState);
         }
 
@@ -89,8 +89,30 @@ public class ChatFlowManager {
                     lineUserId,
                     "AI ไม่สามารถตอบได้ จึงส่งต่อให้แอดมินครับ"
             );
+
+            // 🌟 เพิ่มการเช็คเวลาตรงนี้ (ถ้านอกเวลาทำการ ให้พ่วงข้อความแจ้งเตือนต่อท้ายคำตอบของ AI)
+            if (!isBusinessHours()) {
+                aiResponse += "\n\nแต่ตอนนี้นอกเวลาทำการแล้ว (เปิด 08:30 - 19:00 น.) พรุ่งนี้เช้าแอดมินจะรีบเข้ามาดูแลให้นะครับ 🙏💤";
+            }
         }
 
         return aiResponse;
+    }
+
+    // ==========================================
+    // 🛠️ Helper Method: ระบบเช็คเวลาทำการของร้าน
+    // ==========================================
+    private boolean isBusinessHours() {
+        // เวลาปัจจุบันในประเทศไทย
+        java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Bangkok"));
+
+        // 🔴 ตั้งเวลาเปิดร้าน (08:30 น.)
+        java.time.LocalTime openTime = java.time.LocalTime.of(8, 30);
+
+        // 🔴 ตั้งเวลาปิดร้าน (19:00 น.)
+        java.time.LocalTime closeTime = java.time.LocalTime.of(19, 0);
+
+        // คืนค่า true ถ้าร้านเปิดอยู่
+        return !now.isBefore(openTime) && !now.isAfter(closeTime);
     }
 }
