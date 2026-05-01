@@ -288,7 +288,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
 
-                String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
+                String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
                 lineMessageService.sendImage(userId, exampleImageUrl);
 
                 responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
