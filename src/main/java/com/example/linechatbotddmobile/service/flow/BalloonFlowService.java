@@ -176,7 +176,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_6_FACEID": // ตรวจซ่อม → ถาม Face ID
                 // ══════════════════════════════════════════════════════════
-                ScreeningAnswer repairAns = aiScreeningService.interpret(msg, lastMessage);
+                ScreeningAnswer repairAns = aiScreeningService.interpret(
+                        AiScreeningService.ScreeningType.REPAIR,
+                        msg
+                );
                 if (repairAns == ScreeningAnswer.YES) {
                     userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
@@ -198,7 +201,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_7_INSTALLMENT": // ตรวจ Face ID → ถามติดผ่อน
                 // ══════════════════════════════════════════════════════════
-                ScreeningAnswer faceIdAns = aiScreeningService.interpret(msg, lastMessage);
+                ScreeningAnswer faceIdAns = aiScreeningService.interpret(
+                        AiScreeningService.ScreeningType.FACE_ID,
+                        msg
+                );
                 if (faceIdAns == ScreeningAnswer.NO) {
                     userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
@@ -220,7 +226,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_8_DEVICE_PHOTOS": // ตรวจติดผ่อน → ขอรูปรอบเครื่อง
                 // ══════════════════════════════════════════════════════════
-                ScreeningAnswer installAns = aiScreeningService.interpret(msg, lastMessage);
+                ScreeningAnswer installAns = aiScreeningService.interpret(
+                        AiScreeningService.ScreeningType.INSTALLMENT,
+                        msg
+                );
                 if (installAns == ScreeningAnswer.YES) {
                     userState.setPreviousState(userState.getCurrentState()); // จำสเต็ปเผื่อแอดมินกดคืนร่างบอท
                     userState.setCurrentState("ADMIN_MODE"); // 🔴 เปลี่ยนจาก REJECTED เป็น ADMIN_MODE
