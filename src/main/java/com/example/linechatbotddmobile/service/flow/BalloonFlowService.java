@@ -245,6 +245,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 userState.setRetryCount(0);
                 userState.setCurrentState("STEP_9_SETTINGS_PHOTO");
+                String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
+                lineMessageService.sendImage(userId, exampleImageUrl);
                 responseMessage = "ผ่านการตรวจสอบเบื้องต้นเรียบร้อยครับ 🎉✅\n\n" +
                         "เพื่อให้แอดมินประเมินสภาพภายนอกได้ชัดเจน รบกวนลูกค้า:\n" +
                         "📸 **ถ่ายรูปรอบเครื่อง 4-5 รูป** (หน้า-หลัง-ข้าง)\n" +
@@ -288,8 +290,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
 
-                String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
-                lineMessageService.sendImage(userId, exampleImageUrl);
+                String exampleImageUrl2 = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
+                lineMessageService.sendImage(userId, exampleImageUrl2);
 
                 responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
                         "ถัดไป รบกวนลูกค้า **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'**\n" +
