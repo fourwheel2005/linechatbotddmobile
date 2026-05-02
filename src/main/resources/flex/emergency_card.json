@@ -96,7 +96,7 @@
           "type": "postback",
           "label": "💬 แอดมินรับเรื่อง",
           "data": "action=take_case&service={{SERVICE_EN}}&userId={{USER_ID}}",
-          "displayText": "แอดมินเข้าดูแลเคสนี้แล้ว"
+          "displayText": "แอดมินเข้าดูแลเคสนี้แล้ว (ลูกค้า: {{CUSTOMER_NAME}})"
         },
         "color": "#17A2B8"
       },
@@ -108,7 +108,7 @@
           "type": "postback",
           "label": "▶️ คืนร่างบอท",
           "data": "action=resume_bot&service={{SERVICE_EN}}&userId={{USER_ID}}",
-          "displayText": "แอดมินกด: เปิดบอทให้เคสนี้ทำงานต่อ"
+          "displayText": "แอดมินกด: เปิดบอทให้เคสนี้ทำงานต่อ (ลูกค้า: {{CUSTOMER_NAME}})"
         },
         "color": "#00B900"
       }

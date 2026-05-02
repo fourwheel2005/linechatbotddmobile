@@ -96,7 +96,7 @@
           "type": "postback",
           "label": "💬 เข้าสรุปยอด & ขอเอกสาร",
           "data": "action=take_case&service={{SERVICE_EN}}&userId={{USER_ID}}",
-          "displayText": "แอดมินเข้าดูแลเคสนี้ (สรุปยอดโอน)"
+          "displayText": "แอดมินเข้าดูแลเคสนี้ (สรุปยอดโอน) (ลูกค้า: {{CUSTOMER_NAME}})"
         },
         "color": "#17A2B8"
       }

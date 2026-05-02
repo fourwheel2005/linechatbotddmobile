@@ -224,6 +224,9 @@ public class LineWebhookController {
 
             if (targetUserId == null || action == null) return;
 
+            // 🌟 1. เพิ่มบรรทัดนี้: ดึงชื่อลูกค้าเตรียมไว้
+            String customerName = getCustomerName(targetUserId);
+
             String adminReplyMessage = "";
             String messageToCustomer = null;
 
@@ -237,7 +240,8 @@ public class LineWebhookController {
                     // 💡 เช็คว่าแอดมินกดอนุมัติในขั้นตอนไหน?
                     if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
                         // 1. กรณีอนุมัติ "รูปรอบเครื่อง"
-                        adminReplyMessage = "✅ ตรวจสภาพผ่าน! บอทกำลังขอรูปตั้งค่าต่อครับ";
+                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                        adminReplyMessage = "✅ ตรวจสภาพผ่าน! (ลูกค้า: " + customerName + ")\nบอทกำลังขอรูปตั้งค่าต่อครับ";
 
                         // ให้ Flow ไปที่สเต็ปขอรูปตั้งค่า
                         state.setCurrentState("STEP_9_APPROVED_PHOTO");
@@ -250,7 +254,8 @@ public class LineWebhookController {
                         }
                     } else {
                         // 2. กรณีอนุมัติ "ขั้นสุดท้าย" (ประเมินเครดิตและส่งราคา)
-                        adminReplyMessage = "✅ อนุมัติเคสผ่านเรียบร้อย! ระบบส่งราคาให้ลูกค้าแล้วครับ";
+                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                        adminReplyMessage = "✅ อนุมัติเคสผ่านเรียบร้อย! (ลูกค้า: " + customerName + ")\nระบบส่งราคาให้ลูกค้าแล้วครับ";
                         messageToCustomer = "🎉 ยินดีด้วยครับ! ข้อมูลของคุณได้รับการอนุมัติเรียบร้อยแล้ว แอดมินจะรีบดำเนินการขั้นตอนต่อไปให้นะครับ";
 
                         state.setCurrentState("STEP_5_PRICING");
@@ -268,11 +273,13 @@ public class LineWebhookController {
                 case "reject_credit":
                     if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
                         // 1. ปฏิเสธเคสเพราะสภาพรูปเครื่องไม่ผ่าน
-                        adminReplyMessage = "❌ ปฏิเสธสภาพเครื่องเรียบร้อยครับ (บอทแจ้งลูกค้าแล้ว)";
+                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                        adminReplyMessage = "❌ ปฏิเสธสภาพเครื่องเรียบร้อยครับ (ลูกค้า: " + customerName + ")\n(บอทแจ้งลูกค้าแล้ว)";
                         messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบรูปภาพ สภาพเครื่องยังไม่ตรงตามเงื่อนไขการรับเครื่องของทางร้านครับ หากมีข้อสงสัยสอบถามแอดมินเพิ่มเติมได้เลยครับ";
                     } else {
                         // 2. ปฏิเสธเคสขั้นสุดท้าย
-                        adminReplyMessage = "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ";
+                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                        adminReplyMessage = "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ (ลูกค้า: " + customerName + ")";
                         messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
                     }
                     state.setCurrentState("REJECTED");
@@ -280,14 +287,16 @@ public class LineWebhookController {
                     break;
 
                 case "take_case":
-                    adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้าต่อในแชท 1-on-1 ได้เลยครับ";
+                    // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                    adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้า (" + customerName + ") ต่อในแชท 1-on-1 ได้เลยครับ";
                     messageToCustomer = "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
                     state.setCurrentState("ADMIN_MODE");
                     userStateRepository.save(state);
                     break;
 
                 case "resume_bot":
-                    adminReplyMessage = "▶️ เปิดบอทให้ดูแลลูกค้าคนนี้ต่อแล้วครับ";
+                    // 👇 2. แทรกชื่อลูกค้าตรงนี้
+                    adminReplyMessage = "▶️ เปิดบอทให้ดูแลลูกค้า (" + customerName + ") ต่อแล้วครับ";
 
                     // 👇 ดึงความจำเดิมกลับมา
                     String prevState = state.getPreviousState();

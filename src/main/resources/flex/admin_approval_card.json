@@ -119,7 +119,7 @@
           "type": "postback",
           "label": "✅ สภาพผ่าน",
           "data": "action=approve&service={{SERVICE_EN}}&userId={{USER_ID}}",
-          "displayText": "แอดมินกด: สภาพผ่าน"
+          "displayText": "แอดมินกด: สภาพผ่าน (ลูกค้า: {{CUSTOMER_NAME}})"
         },
         "color": "#00B900"
       },
@@ -131,7 +131,7 @@
           "type": "postback",
           "label": "❌ ไม่ผ่าน",
           "data": "action=reject&service={{SERVICE_EN}}&userId={{USER_ID}}",
-          "displayText": "แอดมินกด: ไม่ผ่าน"
+          "displayText": "แอดมินกด: ไม่ผ่าน (ลูกค้า: {{CUSTOMER_NAME}})"
         },
         "color": "#F0F0F0"
       }
