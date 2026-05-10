@@ -145,13 +145,19 @@ public class LineMessageService {
     // =========================================================
 
     public void sendTextMessage(String toUserId, String text) {
+        trySendTextMessage(toUserId, text);
+    }
+
+    public boolean trySendTextMessage(String toUserId, String text) {
         try {
             messagingApiClient.pushMessage(
                     UUID.randomUUID(),
                     new PushMessageRequest(toUserId, List.of(new TextMessage(text)), false, null)
             );
+            return true;
         } catch (Exception e) {
             log.error("❌ ล้มเหลวในการส่งข้อความหา {}: ", toUserId, e);
+            return false;
         }
     }
 

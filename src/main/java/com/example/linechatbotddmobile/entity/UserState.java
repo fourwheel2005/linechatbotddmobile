@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "user_states")
 @Data // สร้าง Getter/Setter ให้อัตโนมัติด้วย Lombok
@@ -34,5 +36,13 @@ public class UserState {
     private String province;
 
     @Column(name = "retry_count")
+    @Builder.Default
     private Integer retryCount = 0; // กำหนดค่าเริ่มต้นเป็น 0
+
+    @Column(name = "follow_up_reminder_started_at")
+    private LocalDateTime followUpReminderStartedAt;
+
+    @Column(name = "follow_up_reminder_sent")
+    @Builder.Default
+    private Boolean followUpReminderSent = false;
 }

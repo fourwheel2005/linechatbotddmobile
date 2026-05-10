@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 
@@ -19,6 +20,8 @@ import java.time.ZoneId;
 @Service
 @RequiredArgsConstructor
 public class BalloonFlowService implements ServiceFlowHandler {
+
+    private static final ZoneId BANGKOK_ZONE = ZoneId.of("Asia/Bangkok");
 
     private final UserStateRepository userStateRepository;
     private final LineMessageService lineMessageService;
@@ -50,6 +53,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             userState.setPreviousState(state);
             userState.setCurrentState("ADMIN_MODE");
             userState.setLastUserMessage(msg);
+            clearFollowUpReminder(userState);
             userStateRepository.save(userState);
             lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
 
@@ -91,6 +95,12 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
                     responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดรุ่นโทรศัพท์ไม่ได้", "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱");
+                    break;
+                }
+
+                if (isUnsupportedIphone11Model(extractedModel)) {
+                    userState.setRetryCount(0);
+                    responseMessage = "ขออภัยครับลูกค้า ทางร้านเปิดรับ 12-17promax ครับ หากลูกค้ามีไอโฟน 12 ขึ้นติดต่อมาอีกครั้งนะครับผม";
                     break;
                 }
 
@@ -381,6 +391,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
         if (responseMessage != null) {
             userState.setLastUserMessage(msg);
         }
+        updateFollowUpReminder(userState, responseMessage != null);
         userStateRepository.save(userState);
 
         return responseMessage;
@@ -421,6 +432,34 @@ public class BalloonFlowService implements ServiceFlowHandler {
         try { return messagingApiClient.getProfile(userId).get().body().displayName(); } catch (Exception e) { return "ลูกค้า"; }
     }
 
+    private void updateFollowUpReminder(UserState userState, boolean botAskedCustomerToContinue) {
+        if (!isFollowUpReminderState(userState.getCurrentState())) {
+            clearFollowUpReminder(userState);
+            return;
+        }
+
+        if (botAskedCustomerToContinue) {
+            userState.setFollowUpReminderStartedAt(LocalDateTime.now(BANGKOK_ZONE));
+            userState.setFollowUpReminderSent(false);
+        }
+    }
+
+    private boolean isFollowUpReminderState(String currentState) {
+        return "STEP_9_SETTINGS_PHOTO".equals(currentState)
+                || "STEP_10_NAME".equals(currentState);
+    }
+
+    private void clearFollowUpReminder(UserState userState) {
+        userState.setFollowUpReminderStartedAt(null);
+        userState.setFollowUpReminderSent(false);
+    }
+
+    private boolean isUnsupportedIphone11Model(String modelName) {
+        if (modelName == null) return false;
+        String normalizedModel = modelName.toLowerCase().replace("iphone", "").trim();
+        return normalizedModel.matches("^11(?:\\b|\\s+.*)");
+    }
+
     private BalloonPrice getPriceForModel(String modelName) {
         if (modelName == null || modelName.trim().isEmpty()) return null;
         String m = modelName.toLowerCase().replace("iphone ", "").trim();
@@ -456,7 +495,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
     private boolean isBusinessHours() {
         // เวลาปัจจุบันในประเทศไทย
-        LocalTime now = LocalTime.now(ZoneId.of("Asia/Bangkok"));
+        LocalTime now = LocalTime.now(BANGKOK_ZONE);
 
         // 🔴 ตั้งเวลาเปิดร้าน (08:30 น.)
         LocalTime openTime = LocalTime.of(8, 30);

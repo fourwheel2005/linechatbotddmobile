@@ -94,6 +94,7 @@ public class LineWebhookController {
             if (isPanic) {
                 userState.setCurrentState("ADMIN_MODE");
                 userState.setLastUserMessage(userMessage); // บันทึกความจำ
+                clearFollowUpReminder(userState);
                 userStateRepository.save(userState);
 
                 String customerName = getCustomerName(lineUserId);
@@ -283,6 +284,7 @@ public class LineWebhookController {
                         messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
                     }
                     state.setCurrentState("REJECTED");
+                    clearFollowUpReminder(state);
                     userStateRepository.save(state);
                     break;
 
@@ -291,6 +293,7 @@ public class LineWebhookController {
                     adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้า (" + customerName + ") ต่อในแชท 1-on-1 ได้เลยครับ";
                     messageToCustomer = "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
                     state.setCurrentState("ADMIN_MODE");
+                    clearFollowUpReminder(state);
                     userStateRepository.save(state);
                     break;
 
@@ -346,5 +349,10 @@ public class LineWebhookController {
         } catch (Exception e) {
             return "ลูกค้า";
         }
+    }
+
+    private void clearFollowUpReminder(UserState userState) {
+        userState.setFollowUpReminderStartedAt(null);
+        userState.setFollowUpReminderSent(false);
     }
 }
