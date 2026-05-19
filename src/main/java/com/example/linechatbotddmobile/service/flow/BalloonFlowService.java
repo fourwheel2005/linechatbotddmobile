@@ -7,6 +7,7 @@ import com.example.linechatbotddmobile.service.ai.AiDataExtractorService;
 import com.example.linechatbotddmobile.service.ai.AiScreeningService;
 import com.example.linechatbotddmobile.service.ai.AiScreeningService.ScreeningAnswer;
 import com.example.linechatbotddmobile.service.line.LineMessageService;
+import com.example.linechatbotddmobile.util.IphoneModelPolicy;
 import com.linecorp.bot.messaging.client.MessagingApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,12 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_2_CAPACITY": // รับรุ่น → ถามความจุ
                 // ══════════════════════════════════════════════════════════
+                if (IphoneModelPolicy.isUnsupportedBelowIphone12Message(msg)) {
+                    userState.setRetryCount(0);
+                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
+                    break;
+                }
+
                 ExtractedData modelData = aiDataExtractorService.extractInfo(msg, lastMessage);
                 String extractedModel = modelData.deviceModel();
 
@@ -98,9 +105,9 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
 
-                if (isUnsupportedIphone11Model(extractedModel)) {
+                if (IphoneModelPolicy.isUnsupportedBelowIphone12Model(extractedModel)) {
                     userState.setRetryCount(0);
-                    responseMessage = "ขออภัยครับลูกค้า ทางร้านเปิดรับ 12-17promax ครับ หากลูกค้ามีไอโฟน 12 ขึ้นติดต่อมาอีกครั้งนะครับผม";
+                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
                     break;
                 }
 
@@ -452,12 +459,6 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private void clearFollowUpReminder(UserState userState) {
         userState.setFollowUpReminderStartedAt(null);
         userState.setFollowUpReminderSent(false);
-    }
-
-    private boolean isUnsupportedIphone11Model(String modelName) {
-        if (modelName == null) return false;
-        String normalizedModel = modelName.toLowerCase().replace("iphone", "").trim();
-        return normalizedModel.matches("^11(?:\\b|\\s+.*)");
     }
 
     private BalloonPrice getPriceForModel(String modelName) {

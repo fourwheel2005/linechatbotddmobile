@@ -5,6 +5,7 @@ import com.example.linechatbotddmobile.repository.ChatHistoryRepository;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
 import com.example.linechatbotddmobile.service.ai.AiChatService; // 🌟 นำเข้า AiChatService
 import com.example.linechatbotddmobile.service.flow.ServiceFlowHandler;
+import com.example.linechatbotddmobile.util.IphoneModelPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,10 @@ public class ChatFlowManager {
 
         if ("ADMIN_MODE".equals(userState.getCurrentState()) || "ADMIN_PHOTO_CHECK".equals(userState.getCurrentState())) {
             return null; // บอทเงียบเวลาแอดมินทำงาน
+        }
+
+        if (IphoneModelPolicy.isUnsupportedBelowIphone12Message(msgLower)) {
+            return IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
         }
 
         boolean isInterest = msgLower.matches(".*(ผ่อน|ดาวน์|ราคา|สนใจ|บอลลูน|รับเครื่อง|เริ่ม).*");

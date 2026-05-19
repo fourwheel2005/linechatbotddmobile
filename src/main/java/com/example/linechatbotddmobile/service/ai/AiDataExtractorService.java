@@ -1,6 +1,7 @@
 package com.example.linechatbotddmobile.service.ai;
 
 import com.example.linechatbotddmobile.dto.ExtractedData;
+import com.example.linechatbotddmobile.util.ThaiProvinceNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,9 +38,10 @@ public class AiDataExtractorService {
                     .call()
                     .entity(ExtractedData.class);
 
-            // ✅ เพิ่ม capacity ใน log
-            log.info("✅ [Extractor] สกัดสำเร็จ: Model={}, Capacity={}, Age={}",
-                    result.deviceModel(), result.capacity(), result.age());
+            String province = normalizeProvince(result.province(), currentMessage);
+
+            log.info("✅ [Extractor] สกัดสำเร็จ: Model={}, Capacity={}, Age={}, Province={}",
+                    result.deviceModel(), result.capacity(), result.age(), province);
 
             // ✅ เพิ่ม capacity ใน constructor (จุดที่ 1)
             // ✅ จุดที่ 1 — สลับให้ตรง record (deviceModel, age, capacity)
@@ -47,14 +49,22 @@ public class AiDataExtractorService {
                     result.deviceModel() != null && !result.deviceModel().isEmpty() ? result.deviceModel() : "unknown",
                     result.age() != null ? result.age() : 0,
                     result.capacity() != null && !result.capacity().isEmpty() ? result.capacity() : "unknown",
-                    result.province() != null && !result.province().isEmpty() ? result.province() : "unknown"
+                    province
             );
 
 // ✅ จุดที่ 2 — fallback ลำดับเดียวกัน
         } catch (Exception e) {
             log.error("❌ [Extractor] ทำงานล้มเหลว: ", e);
             // ✅ เพิ่ม capacity ใน fallback (จุดที่ 2)
-            return new ExtractedData("unknown", 0, "unknown","unknown");
+            return new ExtractedData("unknown", 0, "unknown", normalizeProvince(null, currentMessage));
         }
+    }
+
+    private String normalizeProvince(String aiProvince, String currentMessage) {
+        if (aiProvince != null && !aiProvince.isBlank() && !"unknown".equalsIgnoreCase(aiProvince)) {
+            return ThaiProvinceNormalizer.normalize(aiProvince).orElse(aiProvince);
+        }
+
+        return ThaiProvinceNormalizer.normalize(currentMessage).orElse("unknown");
     }
 }
