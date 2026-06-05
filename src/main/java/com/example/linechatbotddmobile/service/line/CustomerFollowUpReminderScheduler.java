@@ -4,6 +4,7 @@ import com.example.linechatbotddmobile.entity.UserState;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class CustomerFollowUpReminderScheduler {
     private final LineMessageService lineMessageService;
 
     @Scheduled(fixedDelay = SCHEDULER_INTERVAL_MS)
+    @SchedulerLock(name = "followUpReminder", lockAtLeastFor = "PT30S", lockAtMostFor = "PT2M")
     @Transactional
     public void sendFollowUpReminderToInactiveCustomers() {
         LocalDateTime cutoff = LocalDateTime.now(BANGKOK_ZONE).minusMinutes(IDLE_THRESHOLD_MINUTES);

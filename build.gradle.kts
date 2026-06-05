@@ -57,6 +57,10 @@ dependencies {
 	implementation("com.bucket4j:bucket4j-core:8.10.1")
 	implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 
+	// --- ShedLock (ป้องกัน scheduled task รันซ้ำเมื่อ scale หลาย instance) ---
+	implementation("net.javacrumbs.shedlock:shedlock-spring:5.16.0")
+	implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0")
+
 	// 🌟🌟🌟 [เพิ่มใหม่] Spring AI (สำหรับน้องทันใจ) 🌟🌟🌟
 	implementation("org.springframework.ai:spring-ai-openai-spring-boot-starter")
 

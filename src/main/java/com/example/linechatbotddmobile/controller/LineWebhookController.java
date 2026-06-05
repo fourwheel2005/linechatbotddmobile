@@ -29,6 +29,7 @@ public class LineWebhookController {
     private final UserStateRepository userStateRepository;
     private final com.example.linechatbotddmobile.service.line.LineMessageService lineMessageService;
     private final com.example.linechatbotddmobile.service.line.LineProfileService lineProfileService;
+    private final com.example.linechatbotddmobile.service.line.WebhookIdempotencyService webhookIdempotencyService;
 
     // ตัวแปรสำหรับหน่วงเวลาการรับรูปภาพ
     private final ConcurrentHashMap<String, Instant> lastImageReceivedTime = new ConcurrentHashMap<>();
@@ -45,6 +46,9 @@ public class LineWebhookController {
     // ==========================================
     @EventMapping
     public void handleFollowEvent(FollowEvent event) {
+        if (!webhookIdempotencyService.markAsProcessed(event.webhookEventId())) {
+            return;
+        }
         String lineUserId = event.source().userId();
         log.info("🎉 มีลูกค้าแอดเพื่อนใหม่: {}", lineUserId);
 
@@ -57,6 +61,9 @@ public class LineWebhookController {
     // ==========================================
     @EventMapping
     public void handleMessageEvent(MessageEvent event) {
+        if (!webhookIdempotencyService.markAsProcessed(event.webhookEventId())) {
+            return;
+        }
         String replyToken = event.replyToken();
         String lineUserId = event.source().userId();
 
@@ -219,6 +226,9 @@ public class LineWebhookController {
     // ==========================================
     @EventMapping
     public void handlePostbackEvent(PostbackEvent event) {
+        if (!webhookIdempotencyService.markAsProcessed(event.webhookEventId())) {
+            return;
+        }
         String postbackData = event.postback().data();
         log.info("🎯 แอดมินกดปุ่ม Postback Data: {}", postbackData);
 
