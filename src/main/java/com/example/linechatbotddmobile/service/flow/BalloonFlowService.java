@@ -56,7 +56,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             userState.setLastUserMessage(msg);
             clearFollowUpReminder(userState);
             userStateRepository.save(userState);
-            lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับคน/หงุดหงิดบอท");
+            lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId, "ลูกค้าต้องการคุยกับแอดมินนุด🫶🏻🥳💵");
 
             if (isBusinessHours()) {
                 return "รับทราบครับ น้องทันใจขออภัยในความไม่สะดวกนะครับ 🙏 เดี๋ยวแอดมินรีบเข้ามาดูแลเคสนี้ให้ทันที รบกวนรอสักครู่นะครับ ⏳";

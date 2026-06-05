@@ -106,7 +106,7 @@ public class LineWebhookController {
                         "general",
                         customerName,
                         lineUserId,
-                        "ลูกค้าต้องการคุยกับคน หรือ หงุดหงิดบอท"
+                        "ลูกค้าต้องการคุยกับแอดมินนุด🫶🏻🥳💵"
                 );
 
                 // ตอบกลับลูกค้า
