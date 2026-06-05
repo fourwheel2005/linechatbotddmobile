@@ -1,32 +1,23 @@
 package com.example.linechatbotddmobile;
 
-import com.example.linechatbotddmobile.admin.AdminUser;
-import com.example.linechatbotddmobile.admin.AdminUserRepository;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
-@SpringBootApplication
+/**
+ * Headless LINE chatbot service — no UI, no admin login.
+ *
+ * UserDetailsServiceAutoConfiguration is excluded because we don't expose any
+ * authenticated endpoint; otherwise Spring Boot would generate a random
+ * password at startup and log a noisy "Using generated security password"
+ * warning that is meaningless for this deployment.
+ */
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 @EnableScheduling
 public class LinechatbotddmobileApplication {
 
-
-
-	public static void main(String[] args) {
-
-
-		System.out.println("Hello");
-		SpringApplication.run(LinechatbotddmobileApplication.class, args);
-	}
-
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
-
-
+    public static void main(String[] args) {
+        SpringApplication.run(LinechatbotddmobileApplication.class, args);
+    }
 }

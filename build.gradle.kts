@@ -46,10 +46,8 @@ dependencies {
 	implementation("com.linecorp.bot:line-bot-spring-boot-handler:8.4.0")
 	implementation("com.linecorp.bot:line-bot-messaging-api-client:8.4.0")
 
-	// --- Thymeleaf & Security ---
-	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
+	// --- Security (กัน CSRF บน webhook endpoint; ไม่มี UI/login) ---
 	implementation("org.springframework.boot:spring-boot-starter-security")
-	implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
 
 	// --- Utilities (Lombok, Rate Limiting, Circuit Breaker) ---
 	compileOnly("org.projectlombok:lombok")
