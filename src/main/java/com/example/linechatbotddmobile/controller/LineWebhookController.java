@@ -18,7 +18,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -29,9 +28,14 @@ public class LineWebhookController {
     private final MessagingApiClient messagingApiClient;
     private final UserStateRepository userStateRepository;
     private final com.example.linechatbotddmobile.service.line.LineMessageService lineMessageService;
+    private final com.example.linechatbotddmobile.service.line.LineProfileService lineProfileService;
 
     // ตัวแปรสำหรับหน่วงเวลาการรับรูปภาพ
     private final ConcurrentHashMap<String, Instant> lastImageReceivedTime = new ConcurrentHashMap<>();
+
+    // เวลาในการรอรับรูปต่อเนื่อง (กันลูกค้าส่งรูปหลายใบติด)
+    private static final long IMAGE_BATCH_WAIT_MS = 3000L;
+    private static final long IMAGE_BATCH_THRESHOLD_MS = 2500L;
 
     // ID ของกลุ่มแอดมิน (เปลี่ยนเป็นของคุณ)
     private final String MAIN_ADMIN_GROUP_ID = "Ced29a5fec5e581b47ffa61d9845e71bf";
@@ -142,10 +146,10 @@ public class LineWebhookController {
 
             new Thread(() -> {
                 try {
-                    Thread.sleep(3000);
+                    Thread.sleep(IMAGE_BATCH_WAIT_MS);
 
                     Instant lastTime = lastImageReceivedTime.get(lineUserId);
-                    if (lastTime != null && Instant.now().minusMillis(2500).isAfter(lastTime)) {
+                    if (lastTime != null && Instant.now().minusMillis(IMAGE_BATCH_THRESHOLD_MS).isAfter(lastTime)) {
                         lastImageReceivedTime.remove(lineUserId);
                         log.info("⏰ หมดเวลาหน่วง โยน [รูปภาพ] เข้า Flow -> userId: {}", lineUserId);
 
@@ -344,19 +348,8 @@ public class LineWebhookController {
         return map;
     }
 
-    private static final long LINE_PROFILE_TIMEOUT_SEC = 5L;
-    private static final String DEFAULT_CUSTOMER_NAME = "ลูกค้า";
-
     private String getCustomerName(String userId) {
-        try {
-            return messagingApiClient.getProfile(userId)
-                    .get(LINE_PROFILE_TIMEOUT_SEC, TimeUnit.SECONDS)
-                    .body()
-                    .displayName();
-        } catch (Exception e) {
-            log.warn("⚠️ getProfile failed for userId={} : {}", userId, e.toString());
-            return DEFAULT_CUSTOMER_NAME;
-        }
+        return lineProfileService.getDisplayName(userId);
     }
 
     private void clearFollowUpReminder(UserState userState) {

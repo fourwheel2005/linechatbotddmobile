@@ -17,6 +17,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -55,16 +56,20 @@ public class LineMessageService {
     @PostConstruct
     public void initTemplates() {
         try {
-            adminCardJsonCache = StreamUtils.copyToString(adminApprovalCardTemplate.getInputStream(), StandardCharsets.UTF_8);
-            emergencyCardJsonCache = StreamUtils.copyToString(emergencyCardTemplate.getInputStream(), StandardCharsets.UTF_8);
-            successCardJsonCache = StreamUtils.copyToString(successCardTemplate.getInputStream(), StandardCharsets.UTF_8);
-
-            // 👇 เพิ่มบรรทัดนี้เข้าไป
-            welcomeCardJsonCache = StreamUtils.copyToString(welcomeCardTemplate.getInputStream(), StandardCharsets.UTF_8);
+            adminCardJsonCache = readResource(adminApprovalCardTemplate);
+            emergencyCardJsonCache = readResource(emergencyCardTemplate);
+            successCardJsonCache = readResource(successCardTemplate);
+            welcomeCardJsonCache = readResource(welcomeCardTemplate);
 
             log.info("✅ โหลด Flex Message Templates เข้าหน่วยความจำสำเร็จ");
         } catch (Exception e) {
             log.error("❌ ไม่สามารถโหลด Flex Message Templates ได้: ", e);
+        }
+    }
+
+    private String readResource(Resource resource) throws java.io.IOException {
+        try (InputStream is = resource.getInputStream()) {
+            return StreamUtils.copyToString(is, StandardCharsets.UTF_8);
         }
     }
 

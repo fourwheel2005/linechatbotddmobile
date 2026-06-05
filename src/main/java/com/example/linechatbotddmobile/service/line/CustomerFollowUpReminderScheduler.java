@@ -18,6 +18,8 @@ import java.util.List;
 public class CustomerFollowUpReminderScheduler {
 
     private static final ZoneId BANGKOK_ZONE = ZoneId.of("Asia/Bangkok");
+    private static final long IDLE_THRESHOLD_MINUTES = 10L;
+    private static final long SCHEDULER_INTERVAL_MS = 60_000L;
     private static final List<String> FOLLOW_UP_STATES = List.of(
             "STEP_9_SETTINGS_PHOTO",
             "STEP_10_NAME"
@@ -28,10 +30,10 @@ public class CustomerFollowUpReminderScheduler {
     private final UserStateRepository userStateRepository;
     private final LineMessageService lineMessageService;
 
-    @Scheduled(fixedDelay = 60_000)
+    @Scheduled(fixedDelay = SCHEDULER_INTERVAL_MS)
     @Transactional
     public void sendFollowUpReminderToInactiveCustomers() {
-        LocalDateTime cutoff = LocalDateTime.now(BANGKOK_ZONE).minusMinutes(10);
+        LocalDateTime cutoff = LocalDateTime.now(BANGKOK_ZONE).minusMinutes(IDLE_THRESHOLD_MINUTES);
         List<UserState> dueStates = userStateRepository.findDueFollowUpReminders(FOLLOW_UP_STATES, cutoff);
 
         for (UserState userState : dueStates) {
@@ -47,7 +49,8 @@ public class CustomerFollowUpReminderScheduler {
             userState.setFollowUpReminderSent(true);
             userStateRepository.save(userState);
 
-            log.info("ส่งข้อความ follow-up หลังลูกค้าเงียบเกิน 10 นาที: userId={}, state={}",
+            log.info("ส่งข้อความ follow-up หลังลูกค้าเงียบเกิน {} นาที: userId={}, state={}",
+                    IDLE_THRESHOLD_MINUTES,
                     userState.getLineUserId(),
                     userState.getCurrentState());
         }

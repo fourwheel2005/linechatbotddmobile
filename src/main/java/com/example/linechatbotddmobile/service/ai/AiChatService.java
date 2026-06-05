@@ -3,6 +3,7 @@ package com.example.linechatbotddmobile.service.ai;
 
 import com.example.linechatbotddmobile.entity.ChatHistory;
 import com.example.linechatbotddmobile.repository.ChatHistoryRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -14,6 +15,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,9 +30,22 @@ public class AiChatService {
     @Value("classpath:prompt/base-system-prompt.st")
     private Resource systemPromptResource;
 
+    private String systemPromptCache;
+
     public AiChatService(ChatClient.Builder chatClientBuilder, ChatHistoryRepository chatHistoryRepository) {
         this.chatClient = chatClientBuilder.build();
         this.chatHistoryRepository = chatHistoryRepository;
+    }
+
+    @PostConstruct
+    public void loadSystemPrompt() {
+        try (InputStream is = systemPromptResource.getInputStream()) {
+            this.systemPromptCache = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
+            log.info("✅ Loaded base-system-prompt.st into memory ({} chars)", systemPromptCache.length());
+        } catch (Exception e) {
+            log.error("❌ ไม่สามารถโหลด base-system-prompt.st ได้: ", e);
+            this.systemPromptCache = "";
+        }
     }
 
     public String generateResponse(String lineUserId, String userMessage) {
@@ -38,8 +53,8 @@ public class AiChatService {
             // 1. บันทึกคำถามของลูกค้าลง Database
             saveChatHistory(lineUserId, "USER", userMessage);
 
-            // 2. โหลด System Prompt
-            String systemPrompt = StreamUtils.copyToString(systemPromptResource.getInputStream(), StandardCharsets.UTF_8);
+            // 2. ใช้ System Prompt จาก cache (โหลดครั้งเดียวตอน startup)
+            String systemPrompt = systemPromptCache;
             List<Message> messageList = new ArrayList<>();
             messageList.add(new SystemMessage(systemPrompt));
 

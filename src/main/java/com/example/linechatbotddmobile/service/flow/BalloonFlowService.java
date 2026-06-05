@@ -7,8 +7,8 @@ import com.example.linechatbotddmobile.service.ai.AiDataExtractorService;
 import com.example.linechatbotddmobile.service.ai.AiScreeningService;
 import com.example.linechatbotddmobile.service.ai.AiScreeningService.ScreeningAnswer;
 import com.example.linechatbotddmobile.service.line.LineMessageService;
+import com.example.linechatbotddmobile.service.line.LineProfileService;
 import com.example.linechatbotddmobile.util.IphoneModelPolicy;
-import com.linecorp.bot.messaging.client.MessagingApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -24,12 +23,15 @@ import java.util.concurrent.TimeUnit;
 public class BalloonFlowService implements ServiceFlowHandler {
 
     private static final ZoneId BANGKOK_ZONE = ZoneId.of("Asia/Bangkok");
+    private static final int MAX_RETRY_ATTEMPTS = 2;
+    private static final LocalTime SHOP_OPEN_TIME = LocalTime.of(8, 30);
+    private static final LocalTime SHOP_CLOSE_TIME = LocalTime.of(19, 0);
 
     private final UserStateRepository userStateRepository;
     private final LineMessageService lineMessageService;
-    private final MessagingApiClient messagingApiClient;
     private final AiDataExtractorService aiDataExtractorService;
     private final AiScreeningService aiScreeningService;
+    private final LineProfileService lineProfileService;
 
     private final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
 
@@ -412,7 +414,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
         int currentRetry = userState.getRetryCount() != null ? userState.getRetryCount() : 0;
         currentRetry++;
 
-        if (currentRetry >= 2) { // 🚨 ถ้าผิดครบ 2 ครั้ง โยนเข้าโหมดแอดมินทันที
+        if (currentRetry >= MAX_RETRY_ATTEMPTS) { // 🚨 ถ้าผิดครบ 2 ครั้ง โยนเข้าโหมดแอดมินทันที
             userState.setPreviousState(userState.getCurrentState());
             userState.setCurrentState("ADMIN_MODE");
             userState.setRetryCount(0); // ล้างค่าทิ้งเพื่อรอรอบใหม่
@@ -436,19 +438,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
         return retryPrompt;
     }
 
-    private static final long LINE_PROFILE_TIMEOUT_SEC = 5L;
-    private static final String DEFAULT_CUSTOMER_NAME = "ลูกค้า";
-
     private String getCustomerName(String userId) {
-        try {
-            return messagingApiClient.getProfile(userId)
-                    .get(LINE_PROFILE_TIMEOUT_SEC, TimeUnit.SECONDS)
-                    .body()
-                    .displayName();
-        } catch (Exception e) {
-            log.warn("⚠️ getProfile failed for userId={} : {}", userId, e.toString());
-            return DEFAULT_CUSTOMER_NAME;
-        }
+        return lineProfileService.getDisplayName(userId);
     }
 
     private void updateFollowUpReminder(UserState userState, boolean botAskedCustomerToContinue) {
@@ -507,17 +498,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
 
     private boolean isBusinessHours() {
-        // เวลาปัจจุบันในประเทศไทย
         LocalTime now = LocalTime.now(BANGKOK_ZONE);
-
-        // 🔴 ตั้งเวลาเปิดร้าน (08:30 น.)
-        LocalTime openTime = LocalTime.of(8, 30);
-
-        // 🔴 ตั้งเวลาปิดร้าน (19:00 น.)
-        LocalTime closeTime = LocalTime.of(19, 0);
-
-        // คืนค่า true ถ้าร้านเปิดอยู่
-        return !now.isBefore(openTime) && !now.isAfter(closeTime);
+        return !now.isBefore(SHOP_OPEN_TIME) && !now.isAfter(SHOP_CLOSE_TIME);
     }
 
     // ==========================================

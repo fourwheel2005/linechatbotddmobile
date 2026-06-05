@@ -34,3 +34,27 @@ line:
     channel-secret: ${LINE_BOT_CHANNEL_SECRET}
     handler:
       path: /callback
+
+resilience4j:
+  retry:
+    instances:
+      lineProfile:
+        max-attempts: 2
+        wait-duration: 300ms
+        retry-exceptions:
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+        ignore-exceptions:
+          - java.lang.InterruptedException
+  circuitbreaker:
+    instances:
+      lineProfile:
+        failure-rate-threshold: 60
+        slow-call-rate-threshold: 80
+        slow-call-duration-threshold: 5s
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        permitted-number-of-calls-in-half-open-state: 3
+        wait-duration-in-open-state: 30s
+        automatic-transition-from-open-to-half-open-enabled: true
