@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -343,11 +344,18 @@ public class LineWebhookController {
         return map;
     }
 
+    private static final long LINE_PROFILE_TIMEOUT_SEC = 5L;
+    private static final String DEFAULT_CUSTOMER_NAME = "ลูกค้า";
+
     private String getCustomerName(String userId) {
         try {
-            return messagingApiClient.getProfile(userId).get().body().displayName();
+            return messagingApiClient.getProfile(userId)
+                    .get(LINE_PROFILE_TIMEOUT_SEC, TimeUnit.SECONDS)
+                    .body()
+                    .displayName();
         } catch (Exception e) {
-            return "ลูกค้า";
+            log.warn("⚠️ getProfile failed for userId={} : {}", userId, e.toString());
+            return DEFAULT_CUSTOMER_NAME;
         }
     }
 

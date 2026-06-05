@@ -21,6 +21,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -170,11 +171,14 @@ public class LineMessageService {
         }
     }
 
+    private static final long LINE_PUSH_TIMEOUT_SEC = 5L;
+
     public void sendImage(String to, String imageUrl) {
         try {
             ImageMessage imageMessage = new ImageMessage(URI.create(imageUrl), URI.create(imageUrl));
             PushMessageRequest pushMessageRequest = new PushMessageRequest(to, List.of(imageMessage), false, null);
-            messagingApiClient.pushMessage(UUID.randomUUID(), pushMessageRequest).get();
+            messagingApiClient.pushMessage(UUID.randomUUID(), pushMessageRequest)
+                    .get(LINE_PUSH_TIMEOUT_SEC, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.error("❌ เกิดข้อผิดพลาดในการส่งรูปภาพถึง: {}", to, e);
         }

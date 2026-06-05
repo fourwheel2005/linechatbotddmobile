@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -435,8 +436,19 @@ public class BalloonFlowService implements ServiceFlowHandler {
         return retryPrompt;
     }
 
+    private static final long LINE_PROFILE_TIMEOUT_SEC = 5L;
+    private static final String DEFAULT_CUSTOMER_NAME = "ลูกค้า";
+
     private String getCustomerName(String userId) {
-        try { return messagingApiClient.getProfile(userId).get().body().displayName(); } catch (Exception e) { return "ลูกค้า"; }
+        try {
+            return messagingApiClient.getProfile(userId)
+                    .get(LINE_PROFILE_TIMEOUT_SEC, TimeUnit.SECONDS)
+                    .body()
+                    .displayName();
+        } catch (Exception e) {
+            log.warn("⚠️ getProfile failed for userId={} : {}", userId, e.toString());
+            return DEFAULT_CUSTOMER_NAME;
+        }
     }
 
     private void updateFollowUpReminder(UserState userState, boolean botAskedCustomerToContinue) {
