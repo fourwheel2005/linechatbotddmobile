@@ -57,6 +57,29 @@ public class LineWebhookController {
     }
 
     // ==========================================
+    // 👋 รับ Event ลูกค้า Unfollow / Block บอท
+    // ==========================================
+    @EventMapping
+    public void handleUnfollowEvent(UnfollowEvent event) {
+        if (!webhookIdempotencyService.markAsProcessed(event.webhookEventId())) {
+            return;
+        }
+        log.info("👋 ลูกค้า unfollow/block บอท: userId={}", event.source().userId());
+        // ไม่ต้องตอบกลับ — replyToken จะใช้ไม่ได้อยู่แล้วเพราะลูกค้าบล็อกแล้ว
+    }
+
+    // ==========================================
+    // 🛡️ Catch-all สำหรับ event อื่นๆ ที่ LINE อาจเพิ่มในอนาคต
+    // (กัน UnsupportedOperationException ทำให้ LINE retry 4 ครั้ง)
+    // ==========================================
+    @EventMapping
+    public void handleDefaultEvent(Event event) {
+        log.info("ℹ️ ได้รับ event ที่ยังไม่ได้จัดการ: type={}, eventId={}",
+                event.getClass().getSimpleName(),
+                event.webhookEventId());
+    }
+
+    // ==========================================
     // ✉️ & 📸 รับ Event ข้อความและรูปภาพ
     // ==========================================
     @EventMapping
