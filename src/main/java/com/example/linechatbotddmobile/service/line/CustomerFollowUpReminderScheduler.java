@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -31,9 +30,11 @@ public class CustomerFollowUpReminderScheduler {
     private final UserStateRepository userStateRepository;
     private final LineMessageService lineMessageService;
 
+    // ไม่ใส่ @Transactional — ภายใน loop มีการเรียก LINE push API (blocking I/O)
+    // ถ้าครอบด้วย transaction เดียว connection จะถูกถือค้างตลอดทั้ง loop
+    // ปล่อยให้ findDueFollowUpReminders และ save() จัดการ transaction สั้นของตัวเอง
     @Scheduled(fixedDelay = SCHEDULER_INTERVAL_MS)
     @SchedulerLock(name = "followUpReminder", lockAtLeastFor = "PT30S", lockAtMostFor = "PT2M")
-    @Transactional
     public void sendFollowUpReminderToInactiveCustomers() {
         LocalDateTime cutoff = LocalDateTime.now(BANGKOK_ZONE).minusMinutes(IDLE_THRESHOLD_MINUTES);
         List<UserState> dueStates = userStateRepository.findDueFollowUpReminders(FOLLOW_UP_STATES, cutoff);

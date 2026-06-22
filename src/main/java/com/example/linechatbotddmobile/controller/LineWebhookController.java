@@ -13,11 +13,14 @@ import com.linecorp.bot.webhook.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -33,6 +36,22 @@ public class LineWebhookController {
 
     // ตัวแปรสำหรับหน่วงเวลาการรับรูปภาพ
     private final ConcurrentHashMap<String, Instant> lastImageReceivedTime = new ConcurrentHashMap<>();
+
+    // 🧵 Thread pool มีขอบเขตสำหรับ debounce รูปภาพ
+    // แทน new Thread() ต่อรูป 1 ใบ (ป้องกัน thread/connection ระเบิดเมื่อลูกค้าส่งรูปรัวๆ)
+    private static final int IMAGE_BATCH_POOL_SIZE = 4;
+    private final ExecutorService imageBatchExecutor = Executors.newFixedThreadPool(
+            IMAGE_BATCH_POOL_SIZE,
+            runnable -> {
+                Thread thread = new Thread(runnable, "image-batch-worker");
+                thread.setDaemon(true);
+                return thread;
+            });
+
+    @PreDestroy
+    void shutdownImageBatchExecutor() {
+        imageBatchExecutor.shutdown();
+    }
 
     // เวลาในการรอรับรูปต่อเนื่อง (กันลูกค้าส่งรูปหลายใบติด)
     private static final long IMAGE_BATCH_WAIT_MS = 3000L;
@@ -113,20 +132,21 @@ public class LineWebhookController {
             String userMessage = textMessageContent.text().trim();
             log.info("📩 ได้รับข้อความจากลูกค้า [{}]: {}", lineUserId, userMessage);
 
-            // ดึงหรือสร้าง State ใหม่
-            UserState userState = userStateRepository.findByLineUserId(lineUserId)
-                    .orElseGet(() -> {
-                        UserState newUser = new UserState();
-                        newUser.setLineUserId(lineUserId);
-                        return newUser;
-                    });
-
             String msg = userMessage.toLowerCase();
 
             // 🚨 Panic Mode: ตรวจจับคำว่า แอดมิน / คุยกับคน
+            // เช็คด้วย regex ก่อน เพื่อไม่ต้องโหลด user_states โดยไม่จำเป็นในทางปกติ
+            // (ทางปกติจะโหลด state ครั้งเดียวภายใน ChatFlowManager → ตัด SELECT ซ้ำ)
             boolean isPanic = msg.matches(".*(แอดมิน|ติดต่อแอดมิน|คุยกับคน|อ่านดีๆ|บอท|บอกไปแล้ว|ไม่รู้เรื่อง|อะไรเนี่ย).*");
 
             if (isPanic) {
+                // โหลด/สร้าง State เฉพาะตอน panic เท่านั้น
+                UserState userState = userStateRepository.findByLineUserId(lineUserId)
+                        .orElseGet(() -> {
+                            UserState newUser = new UserState();
+                            newUser.setLineUserId(lineUserId);
+                            return newUser;
+                        });
                 userState.setCurrentState("ADMIN_MODE");
                 userState.setLastUserMessage(userMessage); // บันทึกความจำ
                 clearFollowUpReminder(userState);
@@ -174,7 +194,7 @@ public class LineWebhookController {
             lastImageReceivedTime.put(lineUserId, Instant.now());
             log.info("📸 ได้รับรูปภาพจาก userId: {} -> หน่วงเวลา 3 วิ", lineUserId);
 
-            new Thread(() -> {
+            imageBatchExecutor.submit(() -> {
                 try {
                     Thread.sleep(IMAGE_BATCH_WAIT_MS);
 
@@ -193,9 +213,10 @@ public class LineWebhookController {
                         }
                     }
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     log.error("Error during image wait", e);
                 }
-            }).start();
+            });
         }
         // ==========================================
         // 4. 🛡️ กรณีลูกค้าส่ง "สติกเกอร์"

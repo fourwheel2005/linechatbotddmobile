@@ -9,7 +9,6 @@ import com.example.linechatbotddmobile.util.IphoneModelPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -25,7 +24,13 @@ public class ChatFlowManager {
     private final LineMessageService lineMessageService;
 
 
-    @Transactional
+    /**
+     * ไม่ใส่ @Transactional ที่ระดับเมธอด — ภายในมีการเรียก OpenAI/LINE API (blocking I/O หลายวินาที)
+     * ถ้าครอบทั้งเมธอดด้วย transaction เดียว DB connection จะถูกถือค้างตลอดช่วง I/O
+     * ทำให้ connection pool หมดเร็วเมื่อมี traffic พร้อมกัน (อาการบอทค้าง).
+     * แต่ละ repository call (find/save/delete) มี transaction สั้นของตัวเองอยู่แล้ว
+     * จึงยืม-คืน connection เฉพาะตอนแตะ DB จริงเท่านั้น
+     */
     public String handleTextMessage(String lineUserId, String userMessage) {
         if (userMessage == null || userMessage.trim().isEmpty()) return null;
 
