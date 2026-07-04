@@ -52,6 +52,27 @@ public class ChatFlowManager {
             return "ล้างข้อมูลเรียบร้อยแล้วครับ 🔄 ลูกค้าสามารถพิมพ์ 'สนใจผ่อน' เพื่อเริ่มต้นใหม่ได้เลยครับ 😊";
         }
 
+        // 📱 ปุ่ม "ผ่อนบอลลูน" จากการ์ดต้อนรับ → เริ่มต้น flow ใหม่เสมอ
+        // เช็คด้วยข้อความตรงตัวที่ปุ่มส่งมา ("สนใจผ่อนบอลลูน") เท่านั้น เพื่อไม่ให้ไปรีเซ็ต
+        // ลูกค้าที่พิมพ์คำว่า "ผ่อน" กลาง flow โดยไม่ตั้งใจ
+        // ต้องอยู่ก่อนเช็ค ADMIN_MODE เพื่อกันอาการกดปุ่มแล้วเงียบ (ต้องพิมพ์ "เริ่มใหม่" เอง)
+        if (userMessage.trim().equals("สนใจผ่อนบอลลูน")) {
+            chatHistoryRepository.deleteByLineUserId(lineUserId);
+            userState.setCurrentState("STEP_1_INFO");
+            userState.setServiceName("ผ่อนบอลลูน");
+            userState.setPreviousState(null);
+            userState.setLastUserMessage(userMessage);
+            userState.setFollowUpReminderStartedAt(null);
+            userState.setFollowUpReminderSent(false);
+            userStateRepository.save(userState);
+
+            for (ServiceFlowHandler handler : flowHandlers) {
+                if (handler.supports("ผ่อนบอลลูน")) {
+                    return handler.processMessage(userState, userMessage);
+                }
+            }
+        }
+
         if ("ADMIN_MODE".equals(userState.getCurrentState()) || "ADMIN_PHOTO_CHECK".equals(userState.getCurrentState())) {
             return null; // บอทเงียบเวลาแอดมินทำงาน
         }
