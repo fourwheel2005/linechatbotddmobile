@@ -29,7 +29,7 @@
   },
   "footer": {
     "type": "box",
-    "layout": "vertical",
+    "layout": "horizontal",
     "spacing": "sm",
     "contents": [
       {
@@ -38,12 +38,22 @@
         "height": "sm",
         "action": {
           "type": "message",
-          "label": "📱 สนใจผ่อนบอลลูน",
+          "label": "📱 ผ่อนบอลลูน",
           "text": "สนใจผ่อนบอลลูน"
         },
         "color": "#00B900"
+      },
+      {
+        "type": "button",
+        "style": "primary",
+        "height": "sm",
+        "action": {
+          "type": "message",
+          "label": "🔒 จำนำ iCloud",
+          "text": "สนใจจำนำ iCloud"
+        },
+        "color": "#1E88E5"
       }
-
     ]
   }
 }

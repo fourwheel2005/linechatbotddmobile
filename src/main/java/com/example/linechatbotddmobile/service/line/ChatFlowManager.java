@@ -17,11 +17,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatFlowManager {
 
+    private static final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
+
     private final UserStateRepository userStateRepository;
     private final List<ServiceFlowHandler> flowHandlers;
     private final AiChatService aiChatService; // 🌟 ฉีด AiChatService เข้ามา
     private final ChatHistoryRepository chatHistoryRepository;
     private final LineMessageService lineMessageService;
+    private final LineProfileService lineProfileService;
 
 
     /**
@@ -55,6 +58,27 @@ public class ChatFlowManager {
 
         if (IphoneModelPolicy.isUnsupportedBelowIphone12Message(msgLower)) {
             return IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
+        }
+
+        // 🔒 สนใจจำนำ iCloud → ส่งต่อให้แอดมินรับช่วงต่อทันที (ไม่เข้า flow อัตโนมัติ)
+        // ต้องเช็คก่อน isInterest เพราะข้อความมีคำว่า "สนใจ" ซึ่งจะไปเข้าเงื่อนไขผ่อนบอลลูนโดยไม่ตั้งใจ
+        if (msgLower.contains("จำนำ")) {
+            userState.setPreviousState(userState.getCurrentState());
+            userState.setCurrentState("ADMIN_MODE");
+            userState.setServiceName("จำนำ iCloud");
+            userState.setLastUserMessage(userMessage);
+            userStateRepository.save(userState);
+
+            lineMessageService.sendEmergencyCard(
+                    ADMIN_GROUP_ID,
+                    "จำนำ iCloud",
+                    "icloud",
+                    lineProfileService.getDisplayName(lineUserId),
+                    lineUserId,
+                    "ลูกค้าสนใจบริการจำนำ iCloud 🔒 รบกวนแอดมินรับช่วงต่อครับ"
+            );
+
+            return "รับทราบครับ 🙏 สำหรับบริการ **จำนำ iCloud** เดี๋ยวแอดมินเข้ามาดูแลและให้รายละเอียดกับลูกค้าโดยตรงเลยนะครับ รอสักครู่ครับ ⏳";
         }
 
         boolean isInterest = msgLower.matches(".*(ผ่อน|ดาวน์|ราคา|สนใจ|บอลลูน|รับเครื่อง|เริ่ม).*");
