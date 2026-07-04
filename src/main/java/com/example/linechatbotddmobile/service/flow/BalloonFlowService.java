@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -34,6 +35,15 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private final LineProfileService lineProfileService;
 
     private final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
+
+    // 📸 รูปตัวอย่างการถ่ายรอบเครื่อง (ของเดิม)
+    private static final String DEVICE_PHOTO_EXAMPLE_IMAGE_URL =
+            "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
+
+    // 🪞 คู่มือ "วิธีถ่ายรูปเครื่องหน้ากระจก" (สำหรับลูกค้าที่มีมือถือเครื่องเดียว)
+    // ⚠️ TODO(mock): ลิงก์นี้เป็น placeholder — เปลี่ยนเป็น URL รูปจริงหลังอัปโหลดขึ้น GitHub
+    private static final String MIRROR_PHOTO_GUIDE_IMAGE_URL =
+            "https://raw.githubusercontent.com/fourwheel2005/image/main/mirror-photo-guide.jpg";
 
     public record BalloonPrice(int buyPrice, int m6, int m8, int m10, int m12) {}
 
@@ -265,12 +275,16 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 userState.setRetryCount(0);
                 userState.setCurrentState("STEP_9_SETTINGS_PHOTO");
-                String exampleImageUrl = "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
-                lineMessageService.sendImage(userId, exampleImageUrl);
+                // ส่งรูปตัวอย่างรอบเครื่อง + คู่มือถ่ายผ่านกระจกเงา "คู่กัน" ในข้อความเดียว
+                lineMessageService.sendImages(userId, List.of(
+                        DEVICE_PHOTO_EXAMPLE_IMAGE_URL,
+                        MIRROR_PHOTO_GUIDE_IMAGE_URL
+                ));
                 responseMessage = "ผ่านการตรวจสอบเบื้องต้นเรียบร้อยครับ 🎉✅\n\n" +
                         "เพื่อให้แอดมินประเมินสภาพภายนอกได้ชัดเจน รบกวนลูกค้า:\n" +
                         "📸 **ถ่ายรูปรอบเครื่อง 4-5 รูป** (หน้า-หลัง-ข้าง)\n" +
-                        "ส่งมาให้น้องทันใจดูสภาพหน่อยครับ (สามารถถ่ายผ่านกระจกเงาได้ครับ🪞)✨";
+                        "ส่งมาให้น้องทันใจดูสภาพหน่อยครับ\n" +
+                        "🪞 ลูกค้าที่มีมือถือเครื่องเดียว ถ่ายผ่านกระจกเงาได้เลยครับ (ดูวิธีตามรูปคู่มือที่แนบให้ด้านบนได้เลยครับ)✨";
                 break;
 
             // ══════════════════════════════════════════════════════════

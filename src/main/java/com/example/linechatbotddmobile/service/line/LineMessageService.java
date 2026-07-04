@@ -189,6 +189,25 @@ public class LineMessageService {
         }
     }
 
+    /**
+     * 🖼️ ส่งรูปภาพหลายรูป "ในข้อความเดียว" (push เดียว) เพื่อให้รูปมาติดกัน/อยู่คู่กัน
+     * LINE รองรับสูงสุด 5 message ต่อ 1 push — ถ้าเกินจะส่งแค่ 5 รูปแรก
+     */
+    public void sendImages(String to, List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) return;
+        try {
+            List<Message> messages = imageUrls.stream()
+                    .limit(5)
+                    .map(url -> (Message) new ImageMessage(URI.create(url), URI.create(url)))
+                    .toList();
+            PushMessageRequest pushMessageRequest = new PushMessageRequest(to, messages, false, null);
+            messagingApiClient.pushMessage(UUID.randomUUID(), pushMessageRequest)
+                    .get(LINE_PUSH_TIMEOUT_SEC, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("❌ เกิดข้อผิดพลาดในการส่งรูปภาพหลายรูปถึง: {}", to, e);
+        }
+    }
+
     // =========================================================
     // Private Helper Methods
     // =========================================================
