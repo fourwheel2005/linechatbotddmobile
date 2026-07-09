@@ -37,13 +37,15 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
 
     // 📸 รูปตัวอย่างการถ่ายรอบเครื่อง (ของเดิม)
+    // ⚠️ ห้ามใช้ raw.githubusercontent.com เสิร์ฟรูปให้ LINE — GitHub rate-limit เป็น 429
+    //    เมื่อโดนดึงถี่ ๆ → รูปที่ LINE ยังไม่เคย cache จะขึ้นกากบาท X (โดยเฉพาะ step ที่ส่ง 2 รูปพร้อมกัน)
+    //    ใช้ jsDelivr CDN (ดึงจากรีโปเดิม ไฟล์อยู่ที่เดิม) ซึ่งออกแบบมาให้ hotlink และไม่ rate-limit
     private static final String DEVICE_PHOTO_EXAMPLE_IMAGE_URL =
-            "https://raw.githubusercontent.com/fourwheel2005/image/main/checkiphone.jpg";
+            "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/checkiphone.jpg";
 
     // 🪞 คู่มือ "วิธีถ่ายรูปเครื่องหน้ากระจก" (สำหรับลูกค้าที่มีมือถือเครื่องเดียว)
-    // ⚠️ TODO(mock): ลิงก์นี้เป็น placeholder — เปลี่ยนเป็น URL รูปจริงหลังอัปโหลดขึ้น GitHub
     private static final String MIRROR_PHOTO_GUIDE_IMAGE_URL =
-            "https://raw.githubusercontent.com/fourwheel2005/image/main/mirror-photo-guide.jpg";
+            "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/mirror-photo-guide.jpg";
 
     public record BalloonPrice(int buyPrice, int m6, int m8, int m10, int m12) {}
 
@@ -324,7 +326,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
 
-                String exampleImageUrl2 = "https://raw.githubusercontent.com/fourwheel2005/image/main/S__8298515.jpg";
+                String exampleImageUrl2 = "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/S__8298515.jpg";
                 lineMessageService.sendImage(userId, exampleImageUrl2);
 
                 responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
