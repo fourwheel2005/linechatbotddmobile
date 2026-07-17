@@ -4,19 +4,24 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     hikari:
+      # max = 20 ให้สอดคล้องกับ worker pool ที่ประมวลผลข้อความ (max 20) — แต่ละงานยืม connection แค่สั้นๆ
       maximum-pool-size: ${DB_POOL_MAX:20}
       minimum-idle: ${DB_POOL_MIN_IDLE:5}
       connection-timeout: 20000
       idle-timeout: 300000
       max-lifetime: 1800000
       pool-name: LineChatbotHikariPool
+      # 🔎 เตือนใน log ถ้ามี connection ถูกถือค้างเกิน 30 วิ = จับ connection รั่วได้ก่อนพัง
+      # (ปกติแต่ละ query คืน connection ใน < 1 วิ — ค่านี้จึงไม่ false alarm ในการทำงานปกติ)
+      leak-detection-threshold: 30000
   jpa:
-    show-sql: true
+    # ปิด SQL log ใน production — พ่นทุก query เปลือง CPU/ดิสก์ (เปิดชั่วคราวได้ด้วย JPA_SHOW_SQL=true)
+    show-sql: ${JPA_SHOW_SQL:false}
     hibernate:
       ddl-auto: update
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_SHOW_SQL:false}
 
   # ✅ ย้าย ai มาอยู่ใต้ spring แบบนี้ครับ
   ai:
