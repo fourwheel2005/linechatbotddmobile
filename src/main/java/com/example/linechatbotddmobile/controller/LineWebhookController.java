@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -48,9 +51,29 @@ public class LineWebhookController {
                 return thread;
             });
 
+    // ⚡ Worker pool มีขอบเขต สำหรับประมวลผลข้อความ/พิกัดของลูกค้า (flow + AI)
+    // เดิมงานหนักรันบน thread ของ webhook (Tomcat) โดยตรง → thread ถูกถือค้างตลอดช่วงรอ AI/DB
+    // พอ traffic เยอะ thread หมด → webhook รับงานใหม่ไม่ได้ = บอท "ไม่เห็นการกดปุ่ม" จนต้อง restart
+    // ย้ายมา pool แยกที่มี queue → คืน 200 ให้ LINE ทันที, thread ของ webhook ว่างเสมอ
+    // ขนาด max = 20 ให้สอดคล้องกับ Hikari pool (20) เพราะแต่ละงานยืม DB connection แค่สั้นๆ ตอนแตะ DB
+    private static final int MSG_POOL_CORE = 8;
+    private static final int MSG_POOL_MAX = 20;
+    private static final int MSG_QUEUE_CAPACITY = 200;
+    private final ExecutorService messageProcessingExecutor = new ThreadPoolExecutor(
+            MSG_POOL_CORE, MSG_POOL_MAX, 60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(MSG_QUEUE_CAPACITY),
+            runnable -> {
+                Thread thread = new Thread(runnable, "msg-worker");
+                thread.setDaemon(true);
+                return thread;
+            },
+            // งานล้น (queue เต็ม + thread เต็ม) → ให้ thread ที่เรียกรันเองเป็น backpressure แทนการทิ้งงานลูกค้า
+            new ThreadPoolExecutor.CallerRunsPolicy());
+
     @PreDestroy
-    void shutdownImageBatchExecutor() {
+    void shutdownExecutors() {
         imageBatchExecutor.shutdown();
+        messageProcessingExecutor.shutdown();
     }
 
     // เวลาในการรอรับรูปต่อเนื่อง (กันลูกค้าส่งรูปหลายใบติด)
@@ -129,62 +152,13 @@ public class LineWebhookController {
         // 2. กรณีลูกค้าส่ง "ข้อความตัวอักษร"
         // ==========================================
         if (event.message() instanceof TextMessageContent textMessageContent) {
-            String userMessage = textMessageContent.text().trim();
+            final String userMessage = textMessageContent.text().trim();
             log.info("📩 ได้รับข้อความจากลูกค้า [{}]: {}", lineUserId, userMessage);
 
-            String msg = userMessage.toLowerCase();
-
-            // 🚨 Panic Mode: ตรวจจับคำว่า แอดมิน / คุยกับคน
-            // เช็คด้วย regex ก่อน เพื่อไม่ต้องโหลด user_states โดยไม่จำเป็นในทางปกติ
-            // (ทางปกติจะโหลด state ครั้งเดียวภายใน ChatFlowManager → ตัด SELECT ซ้ำ)
-            boolean isPanic = msg.matches(".*(แอดมิน|ติดต่อแอดมิน|คุยกับคน|อ่านดีๆ|บอท|บอกไปแล้ว|ไม่รู้เรื่อง|อะไรเนี่ย).*");
-
-            if (isPanic) {
-                // โหลด/สร้าง State เฉพาะตอน panic เท่านั้น
-                UserState userState = userStateRepository.findByLineUserId(lineUserId)
-                        .orElseGet(() -> {
-                            UserState newUser = new UserState();
-                            newUser.setLineUserId(lineUserId);
-                            return newUser;
-                        });
-                userState.setCurrentState("ADMIN_MODE");
-                userState.setLastUserMessage(userMessage); // บันทึกความจำ
-                clearFollowUpReminder(userState);
-                userStateRepository.save(userState);
-
-                String customerName = getCustomerName(lineUserId);
-
-                // แจ้งเตือนแอดมินในกลุ่ม
-                lineMessageService.sendEmergencyCard(
-                        MAIN_ADMIN_GROUP_ID,
-                        "ติดต่อทั่วไป",
-                        "general",
-                        customerName,
-                        lineUserId,
-                        "ลูกค้าต้องการคุยกับแอดมินนุด🫶🏻🥳💵"
-                );
-
-                // ตอบกลับลูกค้า
-                messagingApiClient.replyMessage(new ReplyMessageRequest(
-                        replyToken, List.of(new TextMessage("รับทราบครับ 🙏 แอดมินรับเรื่องแล้ว รบกวนรอสักครู่นะครับ ⏳")), false
-                ));
-                return; // 🛑 จบการทำงาน ไม่ส่งเข้า Flow
-            }
-
-            // 🧠 ส่งเข้า FlowManager เพื่อเลือก Flow บริการ
-            try {
-                String replyText = chatFlowManager.handleTextMessage(lineUserId, userMessage);
-                if (replyText != null && !replyText.trim().isEmpty()) {
-                    messagingApiClient.replyMessage(new ReplyMessageRequest(
-                            replyToken, List.of(new TextMessage(replyText)), false
-                    ));
-                }
-            } catch (Exception e) {
-                log.error("❌ เกิดข้อผิดพลาดในการประมวลผลข้อความ: ", e);
-                messagingApiClient.replyMessage(new ReplyMessageRequest(
-                        replyToken, List.of(new TextMessage("ขออภัยครับ ระบบประมวลผลขัดข้องชั่วคราว รบกวนรอแอดมินสักครู่นะครับ 🛠️")), false
-                ));
-            }
+            // ⚡ โยนงานหนัก (flow + AI) เข้า worker pool — ไม่บล็อก thread ของ webhook
+            // คืน 200 ให้ LINE ทันที กัน thread ของ Tomcat ถูกถือค้างระหว่างรอ AI/DB
+            messageProcessingExecutor.submit(() ->
+                    handleCustomerTextMessage(lineUserId, userMessage, replyToken));
         }
 
         // ==========================================
@@ -246,22 +220,90 @@ public class LineWebhookController {
         else if (event.message() instanceof LocationMessageContent locationMessage) {
             log.info("🛡️ ลูกค้าส่ง Location");
 
-            // แอบดึงชื่อจังหวัดหรือที่อยู่จาก Location ออกมาให้ AI ประมวลผลต่อได้เลย! (ถือว่าลูกค้าพิมพ์ข้อความ)
-            String addressInfo = locationMessage.address() != null ? locationMessage.address() : "";
-            String titleInfo = locationMessage.title() != null ? locationMessage.title() : "";
-            String combinedLocationText = titleInfo + " " + addressInfo;
+            // ⚡ โยนเข้า worker pool เช่นเดียวกับข้อความ (ภายในเรียก flow + AI)
+            messageProcessingExecutor.submit(() ->
+                    handleLocationMessage(lineUserId, locationMessage, replyToken));
+        }
+    }
 
-            // โยนข้อมูลที่อยู่ เข้าไปใน Flow เหมือนลูกค้าพิมพ์ตัวอักษรปกติ
-            String replyText = chatFlowManager.handleTextMessage(lineUserId, combinedLocationText);
-            if (replyText != null && !replyText.isEmpty()) {
+    // ==========================================
+    // ⚙️ ประมวลผลข้อความลูกค้า — รันบน messageProcessingExecutor (ไม่ใช่ thread ของ webhook)
+    // ==========================================
+    private void handleCustomerTextMessage(String lineUserId, String userMessage, String replyToken) {
+        String msg = userMessage.toLowerCase();
+
+        // 🚨 Panic Mode: ตรวจจับคำว่า แอดมิน / คุยกับคน
+        // เช็คด้วย regex ก่อน เพื่อไม่ต้องโหลด user_states โดยไม่จำเป็นในทางปกติ
+        // (ทางปกติจะโหลด state ครั้งเดียวภายใน ChatFlowManager → ตัด SELECT ซ้ำ)
+        boolean isPanic = msg.matches(".*(แอดมิน|ติดต่อแอดมิน|คุยกับคน|อ่านดีๆ|บอท|บอกไปแล้ว|ไม่รู้เรื่อง|อะไรเนี่ย).*");
+
+        if (isPanic) {
+            // โหลด/สร้าง State เฉพาะตอน panic เท่านั้น
+            UserState userState = userStateRepository.findByLineUserId(lineUserId)
+                    .orElseGet(() -> {
+                        UserState newUser = new UserState();
+                        newUser.setLineUserId(lineUserId);
+                        return newUser;
+                    });
+            userState.setCurrentState("ADMIN_MODE");
+            userState.setLastUserMessage(userMessage); // บันทึกความจำ
+            clearFollowUpReminder(userState);
+            userStateRepository.save(userState);
+
+            String customerName = getCustomerName(lineUserId);
+
+            // แจ้งเตือนแอดมินในกลุ่ม
+            lineMessageService.sendEmergencyCard(
+                    MAIN_ADMIN_GROUP_ID,
+                    "ติดต่อทั่วไป",
+                    "general",
+                    customerName,
+                    lineUserId,
+                    "ลูกค้าต้องการคุยกับแอดมินนุด🫶🏻🥳💵"
+            );
+
+            // ตอบกลับลูกค้า
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken, List.of(new TextMessage("รับทราบครับ 🙏 แอดมินรับเรื่องแล้ว รบกวนรอสักครู่นะครับ ⏳")), false
+            ));
+            return; // 🛑 จบการทำงาน ไม่ส่งเข้า Flow
+        }
+
+        // 🧠 ส่งเข้า FlowManager เพื่อเลือก Flow บริการ
+        try {
+            String replyText = chatFlowManager.handleTextMessage(lineUserId, userMessage);
+            if (replyText != null && !replyText.trim().isEmpty()) {
                 messagingApiClient.replyMessage(new ReplyMessageRequest(
                         replyToken, List.of(new TextMessage(replyText)), false
                 ));
-            } else {
-                messagingApiClient.replyMessage(new ReplyMessageRequest(
-                        replyToken, List.of(new TextMessage("น้องทันใจได้รับพิกัดแล้วครับ 📍 รบกวนลูกค้าพิมพ์ยืนยัน 'ชื่อจังหวัด' ให้น้องทันใจอีกครั้งเพื่อความชัวร์นะครับ 😊")), false
-                ));
             }
+        } catch (Exception e) {
+            log.error("❌ เกิดข้อผิดพลาดในการประมวลผลข้อความ: ", e);
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken, List.of(new TextMessage("ขออภัยครับ ระบบประมวลผลขัดข้องชั่วคราว รบกวนรอแอดมินสักครู่นะครับ 🛠️")), false
+            ));
+        }
+    }
+
+    // ==========================================
+    // ⚙️ ประมวลผลพิกัด (Location) — รันบน messageProcessingExecutor เช่นกัน
+    // ==========================================
+    private void handleLocationMessage(String lineUserId, LocationMessageContent locationMessage, String replyToken) {
+        // แอบดึงชื่อจังหวัดหรือที่อยู่จาก Location ออกมาให้ AI ประมวลผลต่อได้เลย! (ถือว่าลูกค้าพิมพ์ข้อความ)
+        String addressInfo = locationMessage.address() != null ? locationMessage.address() : "";
+        String titleInfo = locationMessage.title() != null ? locationMessage.title() : "";
+        String combinedLocationText = titleInfo + " " + addressInfo;
+
+        // โยนข้อมูลที่อยู่ เข้าไปใน Flow เหมือนลูกค้าพิมพ์ตัวอักษรปกติ
+        String replyText = chatFlowManager.handleTextMessage(lineUserId, combinedLocationText);
+        if (replyText != null && !replyText.isEmpty()) {
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken, List.of(new TextMessage(replyText)), false
+            ));
+        } else {
+            messagingApiClient.replyMessage(new ReplyMessageRequest(
+                    replyToken, List.of(new TextMessage("น้องทันใจได้รับพิกัดแล้วครับ 📍 รบกวนลูกค้าพิมพ์ยืนยัน 'ชื่อจังหวัด' ให้น้องทันใจอีกครั้งเพื่อความชัวร์นะครับ 😊")), false
+            ));
         }
     }
 
