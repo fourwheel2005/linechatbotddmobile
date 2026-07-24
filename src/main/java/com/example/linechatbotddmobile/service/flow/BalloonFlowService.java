@@ -323,10 +323,9 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
             // ══════════════════════════════════════════════════════════
             case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ
-                // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_10_NAME");
 
-                String exampleImageUrl2 = "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/S__8298515.jpg";
+                String exampleImageUrl2 = "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/capsystem.jpg";
                 lineMessageService.sendImage(userId, exampleImageUrl2);
 
                 responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
