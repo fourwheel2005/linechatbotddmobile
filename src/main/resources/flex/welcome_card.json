@@ -2,7 +2,7 @@
   "type": "bubble",
   "hero": {
     "type": "image",
-    "url": "https://raw.githubusercontent.com/fourwheel2005/image/main/thunjailogo.png.png.jpg",
+    "url": "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/thunjailogo.png",
     "size": "full",
     "aspectRatio": "20:13",
     "aspectMode": "cover"

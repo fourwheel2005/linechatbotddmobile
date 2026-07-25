@@ -1,5 +1,6 @@
 package com.example.linechatbotddmobile.service.flow;
 
+import com.example.linechatbotddmobile.config.AdminGroup;
 import com.example.linechatbotddmobile.dto.ExtractedData;
 import com.example.linechatbotddmobile.entity.UserState;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
@@ -34,7 +35,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private final AiScreeningService aiScreeningService;
     private final LineProfileService lineProfileService;
 
-    private final String ADMIN_GROUP_ID = "C76744781eae27ba2499edb000665e436";
+    private final String ADMIN_GROUP_ID = AdminGroup.MAIN_GROUP_ID;
 
     // 📸 รูปตัวอย่างการถ่ายรอบเครื่อง (ของเดิม)
     // ⚠️ ห้ามใช้ raw.githubusercontent.com เสิร์ฟรูปให้ LINE — GitHub rate-limit เป็น 429
@@ -88,7 +89,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_1_INFO": // เริ่มต้น → ถามรุ่น
                 // ══════════════════════════════════════════════════════════
                 userState.setCurrentState("STEP_2_CAPACITY");
-                responseMessage = "ขอบคุณครับที่สนใจผ่อนบอลลูน! 🎈✨ รบกวนลูกค้า ระบุรุ่นโทรศัพท์ที่ต้องการผ่อนให้น้องทันใจด้วยนะครับ 📱😊";
+                responseMessage = "สวัสดีครับ 🙏😊 น้องทันใจยินดีให้บริการผ่อนบอลลูนครับ ขออนุญาตสอบถามข้อมูลเบื้องต้นนะครับ\n" +
+                "👉 ลูกค้าใช้ไอโฟน **รุ่นไหน** ครับ? (เช่น 13 Pro Max, 15 Pro, 16)";
                 break;
 
             // ══════════════════════════════════════════════════════════

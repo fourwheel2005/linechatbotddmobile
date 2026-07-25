@@ -1,5 +1,6 @@
 package com.example.linechatbotddmobile.controller; // ปรับให้ตรงกับ package ของคุณ
 
+import com.example.linechatbotddmobile.config.AdminGroup;
 import com.example.linechatbotddmobile.entity.UserState;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
 import com.example.linechatbotddmobile.service.line.ChatFlowManager; // ปรับให้ตรง
@@ -80,8 +81,12 @@ public class LineWebhookController {
     private static final long IMAGE_BATCH_WAIT_MS = 3000L;
     private static final long IMAGE_BATCH_THRESHOLD_MS = 2500L;
 
-    // ID ของกลุ่มแอดมิน (เปลี่ยนเป็นของคุณ)
-    private final String MAIN_ADMIN_GROUP_ID = "Ced29a5fec5e581b47ffa61d9845e71bf";
+    // ID ของกลุ่มแอดมินสำหรับเคส panic (ลูกค้าขอคุยกับคนโดยตรง / กดปุ่ม "คุยกับแอดมิน")
+    // ตั้งใจแยกจากกลุ่มของ flow — ดูรายละเอียดที่ AdminGroup
+    private final String PANIC_ADMIN_GROUP_ID = AdminGroup.PANIC_GROUP_ID;
+
+    // บริการเดียวที่มี flow อัตโนมัติ — ใช้เติมกลับตอนแอดมินคืนบอทให้ลูกค้า
+    private static final String BALLOON_SERVICE = "ผ่อนบอลลูน";
 
     // ==========================================
     // 🎉 รับ Event ลูกค้า Add Friend ใหม่
@@ -235,7 +240,12 @@ public class LineWebhookController {
         // 🚨 Panic Mode: ตรวจจับคำว่า แอดมิน / คุยกับคน
         // เช็คด้วย regex ก่อน เพื่อไม่ต้องโหลด user_states โดยไม่จำเป็นในทางปกติ
         // (ทางปกติจะโหลด state ครั้งเดียวภายใน ChatFlowManager → ตัด SELECT ซ้ำ)
-        boolean isPanic = msg.matches(".*(แอดมิน|ติดต่อแอดมิน|คุยกับคน|อ่านดีๆ|บอท|บอกไปแล้ว|ไม่รู้เรื่อง|อะไรเนี่ย).*");
+        //
+        // ⚠️ ยกเว้นข้อความจากปุ่มริชเมนู (เช่น "คุยกับแอดมิน") — ปุ่มนั้นทางร้านต้องการให้พาเข้า
+        //    flow ปกติ (ตอบด้วยการ์ดต้อนรับให้เลือกบริการ) ไม่ใช่เรียกแอดมินทันที
+        //    ถ้าไม่ยกเว้น จะโดน regex คำว่า "แอดมิน" ดักไปก่อนตั้งแต่ตรงนี้
+        boolean isPanic = !ChatFlowManager.isWelcomeMenuTrigger(userMessage)
+                && msg.matches(".*(แอดมิน|ติดต่อแอดมิน|คุยกับคน|อ่านดีๆ|บอท|บอกไปแล้ว|ไม่รู้เรื่อง|อะไรเนี่ย).*");
 
         if (isPanic) {
             // โหลด/สร้าง State เฉพาะตอน panic เท่านั้น
@@ -245,6 +255,11 @@ public class LineWebhookController {
                         newUser.setLineUserId(lineUserId);
                         return newUser;
                     });
+            // เก็บบริการ/สเต็ปที่ลูกค้าคุยค้างไว้ก่อน เพราะเดี๋ยว state จะถูกทับเป็น ADMIN_MODE
+            String pendingService = userState.getServiceName();
+            String pendingStep = userState.getCurrentState();
+
+            rememberStepStateForResume(userState); // จำสเต็ปเดิมไว้ให้ปุ่ม "คืนบอท" พากลับมาต่อได้
             userState.setCurrentState("ADMIN_MODE");
             userState.setLastUserMessage(userMessage); // บันทึกความจำ
             clearFollowUpReminder(userState);
@@ -252,14 +267,17 @@ public class LineWebhookController {
 
             String customerName = getCustomerName(lineUserId);
 
-            // แจ้งเตือนแอดมินในกลุ่ม
+            // แจ้งเตือนแอดมินในกลุ่มเดียวกับเคสของ flow และบอกด้วยว่าลูกค้าค้างอยู่บริการไหน สเต็ปไหน
+            // แอดมินจะได้รู้บริบททันทีว่าต้องคุยต่อเรื่องผ่อนบอลลูน หรือจำนำ iCloud
             lineMessageService.sendEmergencyCard(
-                    MAIN_ADMIN_GROUP_ID,
-                    "ติดต่อทั่วไป",
-                    "general",
+                    PANIC_ADMIN_GROUP_ID,
+                    pendingService != null && !pendingService.isBlank() ? pendingService : "ติดต่อทั่วไป",
+                    toServiceCode(pendingService),
                     customerName,
                     lineUserId,
                     "ลูกค้าต้องการคุยกับแอดมินนุด🫶🏻🥳💵"
+                            + (pendingStep != null ? "\nค้างอยู่ที่: " + pendingStep : "")
+                            + "\nข้อความ: " + userMessage
             );
 
             // ตอบกลับลูกค้า
@@ -393,6 +411,7 @@ public class LineWebhookController {
                     // 👇 2. แทรกชื่อลูกค้าตรงนี้
                     adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้า (" + customerName + ") ต่อในแชท 1-on-1 ได้เลยครับ";
                     messageToCustomer = "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
+                    rememberStepStateForResume(state); // จำสเต็ปเดิมไว้ก่อนปิดบอท
                     state.setCurrentState("ADMIN_MODE");
                     clearFollowUpReminder(state);
                     userStateRepository.save(state);
@@ -409,6 +428,12 @@ public class LineWebhookController {
                         state.setPreviousState(null); // ล้างความจำทิ้ง
                     } else {
                         state.setCurrentState("STEP_1_INFO"); // กันเหนียวกรณีไม่มีความจำ
+                    }
+                    // 🩹 ถ้า serviceName หายไป (เคสที่เข้า ADMIN_MODE จาก panic mode / [CALL_ADMIN]
+                    //    ซึ่งไม่เคยตั้ง serviceName) ต้องเติมกลับ ไม่งั้น ChatFlowManager หา handler ไม่เจอ
+                    //    → ลูกค้าจะคุยกับ AI แทนที่จะกลับเข้า flow (อาการ "บอทตอบไม่เข้า flow")
+                    if (state.getServiceName() == null || state.getServiceName().isBlank()) {
+                        state.setServiceName(BALLOON_SERVICE);
                     }
                     userStateRepository.save(state);
 
@@ -451,5 +476,27 @@ public class LineWebhookController {
     private void clearFollowUpReminder(UserState userState) {
         userState.setFollowUpReminderStartedAt(null);
         userState.setFollowUpReminderSent(false);
+    }
+
+    /**
+     * แปลงชื่อบริการภาษาไทย → โค้ดสั้นที่การ์ดแอดมินใช้ (ไปอยู่ใน postback data)
+     */
+    private String toServiceCode(String serviceName) {
+        if (serviceName == null || serviceName.isBlank()) return "general";
+        if (serviceName.contains("บอลลูน")) return "balloon";
+        if (serviceName.contains("iCloud") || serviceName.contains("จำนำ")) return "icloud";
+        return "general";
+    }
+
+    /**
+     * จำสเต็ปปัจจุบันไว้ให้ปุ่ม "คืนบอท" (resume_bot) พาลูกค้ากลับมาต่อได้ถูกที่
+     * เก็บเฉพาะ state ที่เป็นสเต็ปของ flow จริงๆ — ถ้าเผลอเก็บ ADMIN_MODE/REJECTED ทับ
+     * ตอนกดคืนบอทจะวนกลับเข้าโหมดแอดมินอีกรอบ = บอทเงียบถาวร
+     */
+    private void rememberStepStateForResume(UserState userState) {
+        String currentState = userState.getCurrentState();
+        if (currentState != null && currentState.startsWith("STEP_")) {
+            userState.setPreviousState(currentState);
+        }
     }
 }
