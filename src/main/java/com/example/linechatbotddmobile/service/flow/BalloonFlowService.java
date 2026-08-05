@@ -17,7 +17,15 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -48,7 +56,36 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private static final String MIRROR_PHOTO_GUIDE_IMAGE_URL =
             "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/mirror-photo-guide.jpg";
 
-    public record BalloonPrice(int buyPrice, int m6, int m8, int m10, int m12) {}
+    // 📅 งวดผ่อนทั้งหมดที่ทางร้านเปิดให้ เรียงจากสั้นไปยาว
+    //    ใช้เป็น "หัวตาราง" ของ price() — ค่าที่ส่งเข้ามาจะไล่ตามลำดับนี้ซ้ายไปขวาเหมือนอ่านตารางราคา
+    private static final List<Integer> INSTALLMENT_MONTHS = List.of(6, 8, 10, 12, 15, 18, 21, 24);
+
+    // 🔢 คำอ่านจำนวนงวดภาษาไทย (เรียงคำยาวก่อน เพื่อไม่ให้ "สิบ" ไปกินคำว่า "สิบแปด")
+    private static final Map<String, Integer> THAI_MONTH_WORDS = buildThaiMonthWords();
+
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+");
+
+    /**
+     * ราคาผ่อนบอลลูนของ 1 รุ่น
+     *
+     * monthlyPayments เก็บ "เฉพาะงวดที่รุ่นนั้นเปิดให้เลือกจริง" เรียงจากสั้นไปยาว
+     * เพราะตารางราคาใหม่ให้จำนวนงวดไม่เท่ากันในแต่ละรุ่น
+     * (13 mini มีแค่ 6-12 งวด, 14 มีถึง 18 งวด, ส่วน 16 Pro ขึ้นไปมีถึง 24 งวด)
+     */
+    public record BalloonPrice(int buyPrice, Map<Integer, Integer> monthlyPayments) {
+
+        public BalloonPrice {
+            monthlyPayments = Collections.unmodifiableMap(new LinkedHashMap<>(monthlyPayments));
+        }
+
+        public boolean supportsMonth(int months) {
+            return monthlyPayments.containsKey(months);
+        }
+
+        public Integer paymentFor(int months) {
+            return monthlyPayments.get(months);
+        }
+    }
 
     @Override
     public boolean supports(String serviceName) {
@@ -106,14 +143,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 String extractedModel = modelData.deviceModel();
 
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
-                    if (msg.matches("^(1[1-7])(?:\\s*(pro|max|plus|mini|pm|p))?.*$")) {
-                        String baseModel = msg.substring(0, 2);
-                        if (msg.contains("pro max") || msg.contains("pm")) extractedModel = baseModel + " Pro Max";
-                        else if (msg.contains("pro") || msg.contains("p")) extractedModel = baseModel + " Pro";
-                        else if (msg.contains("plus")) extractedModel = baseModel + " Plus";
-                        else if (msg.contains("mini")) extractedModel = baseModel + " mini";
-                        else extractedModel = baseModel;
-                    }
+                    extractedModel = guessModelFromRawMessage(msg);
                 }
 
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
@@ -367,25 +397,41 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_5_PRICING":
                 // ══════════════════════════════════════════════════════════
-                userState.setCurrentState("STEP_6_MONTH_SELECTION");
                 BalloonPrice price = getPriceForModel(userState.getDeviceModel());
+
                 if (price == null) {
+                    // ไม่มีรุ่นนี้ในตารางราคา (เช่น iPhone 12 ที่ถอดออกจากตารางแล้ว) → ห้ามเดาราคาเอง
+                    // เดิมโค้ดดันย้าย state ไป STEP_6 ทั้งที่ยังไม่ได้เสนอราคา ลูกค้าเลยค้างอยู่หน้าที่ไม่มีตัวเลือกให้เลือก
+                    userState.setPreviousState(state);
+                    userState.setCurrentState("ADMIN_MODE");
+                    lineMessageService.sendEmergencyCard(ADMIN_GROUP_ID, getServiceName(), "balloon", getCustomerName(userId), userId,
+                            "⚠️ รุ่นนี้ไม่มีในตารางราคา รบกวนแอดมินเสนอราคาเองครับ\nรุ่น: "
+                                    + userState.getDeviceModel() + " " + userState.getCapacity());
                     responseMessage = getWaitMessage("สำหรับรุ่นนี้ แอดมินได้รับเรื่องเพื่อเตรียมเสนอราคาพิเศษให้แล้วครับ");
                     break;
                 }
-                responseMessage = "ข้อเสนอสำหรับ **iPhone " + userState.getDeviceModel() + "** มาแล้วครับ! 🎉\n" +
-                        "- ยอดรับซื้อ: " + String.format("%,d", price.buyPrice()) + " บ.\n" +
-                        "- 6 เดือน: งวดละ " + String.format("%,d", price.m6()) + " บ.\n" +
-                        "- 8 เดือน: งวดละ " + String.format("%,d", price.m8()) + " บ.\n" +
-                        "- 10 เดือน: งวดละ " + String.format("%,d", price.m10()) + " บ.\n" +
-                        "- 12 เดือน: งวดละ " + String.format("%,d", price.m12()) + " บ.\n\n" +
-                        "👉 ลูกค้าสนใจส่งกี่เดือนดีครับ? (พิมพ์ตัวเลข 6, 8, 10 หรือ 12 ได้เลยครับ)";
+
+                userState.setCurrentState("STEP_6_MONTH_SELECTION");
+                StringBuilder offer = new StringBuilder()
+                        .append("ข้อเสนอสำหรับ **iPhone ").append(userState.getDeviceModel()).append("** มาแล้วครับ! 🎉\n")
+                        .append("- ยอดรับซื้อ: ").append(formatBaht(price.buyPrice())).append(" บ.\n");
+                // ไล่เฉพาะงวดที่รุ่นนี้มีจริง — รุ่นเล็กจะได้ไม่โชว์ 15/18/21/24 ที่ร้านไม่ได้เปิดให้
+                price.monthlyPayments().forEach((months, amount) ->
+                        offer.append("- ").append(months).append(" เดือน: งวดละ ").append(formatBaht(amount)).append(" บ.\n"));
+                offer.append("\n👉 ลูกค้าสนใจส่งกี่เดือนดีครับ? (พิมพ์ตัวเลข ")
+                        .append(formatMonthChoices(price))
+                        .append(" ได้เลยครับ)");
+                responseMessage = offer.toString();
                 break;
 
             case "STEP_6_MONTH_SELECTION":
-                boolean isValidMonth = msg.matches(".*(6|8|10|12|หก|แปด|สิบ).*");
-                if (!isValidMonth) {
-                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าเลือกระยะเวลาผ่อนผิด", "ลูกค้าสะดวกส่งงวดละกี่เดือนดีครับ? 😊\nมีให้เลือก: **6, 8, 10 หรือ 12 เดือน** ครับ");
+                BalloonPrice selectedModelPrice = getPriceForModel(userState.getDeviceModel());
+                Integer selectedMonths = parseSelectedMonth(msg, selectedModelPrice);
+
+                if (selectedMonths == null) {
+                    String monthChoices = selectedModelPrice != null ? formatMonthChoices(selectedModelPrice) : "6, 8, 10 หรือ 12";
+                    responseMessage = handleRetryLogic(userState, userId, msg, "ลูกค้าเลือกระยะเวลาผ่อนผิด",
+                            "ลูกค้าสะดวกส่งงวดละกี่เดือนดีครับ? 😊\nมีให้เลือก: **" + monthChoices + " เดือน** ครับ");
                     break;
                 }
 
@@ -397,7 +443,9 @@ public class BalloonFlowService implements ServiceFlowHandler {
                         "balloon",
                         getCustomerName(userId),
                         userId,
-                        "ลูกค้าเลือกระยะเวลา: " + msg + " เดือน"
+                        "รุ่น: " + userState.getDeviceModel() + " " + userState.getCapacity()
+                                + "\nลูกค้าเลือกระยะเวลา: " + selectedMonths + " เดือน"
+                                + " (งวดละ " + formatBaht(selectedModelPrice.paymentFor(selectedMonths)) + " บ.)"
                 );
                 responseMessage = getWaitMessage("รับทราบครับ! น้องทันใจได้รับข้อมูลแล้ว 📝 แอดมินจะเข้ามาสรุปยอด แจ้งเงื่อนไข และขอเอกสารทำสัญญาให้นะครับ");
                 break;
@@ -480,38 +528,167 @@ public class BalloonFlowService implements ServiceFlowHandler {
         userState.setFollowUpReminderSent(false);
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // 💰 ตารางราคาผ่อนบอลลูน — เรียงแถวตามตารางราคาของร้าน (13 mini → 17 Pro Max)
+    //
+    //    ลำดับตัวเลขหลัง "รับซื้อ" = งวด 6, 8, 10, 12, 15, 18, 21, 24 (INSTALLMENT_MONTHS)
+    //    ใส่เท่าที่รุ่นนั้นมีในตาราง แล้วหยุด — รุ่นที่ตารางเว้นว่างไว้จะไม่ถูกเสนอให้ลูกค้าเลือก
+    //
+    //    ℹ️ iPhone 12 ไม่มีอยู่ในตารางราคาใบใหม่ แต่ทางร้านยังรับอยู่ จึงคงเรทเดิมไว้
+    //       (มีแค่งวด 6-12 เหมือนเดิม ไม่ได้เปิดงวดยาว 15/18/21/24 ให้)
+    // ══════════════════════════════════════════════════════════════════════
     private BalloonPrice getPriceForModel(String modelName) {
         if (modelName == null || modelName.trim().isEmpty()) return null;
-        String m = modelName.toLowerCase().replace("iphone ", "").trim();
+        String m = normalizeModelName(modelName);
         return switch (m) {
-            case "12"         -> new BalloonPrice(3500,  1190,  890,  790,  690);
-            case "12 pro"     -> new BalloonPrice(4000,  1290, 1090,  890,  790);
-            case "12 pro max" -> new BalloonPrice(4000,  1290, 1090,  890,  790);
-            case "13 mini"    -> new BalloonPrice(3500,  1190,  890,  790,  690);
-            case "13"         -> new BalloonPrice(5000,  1590, 1290, 1090,  990);
-            case "13 pro"     -> new BalloonPrice(7000,  2290, 1790, 1590, 1390);
-            case "13 pro max" -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
-            case "14"         -> new BalloonPrice(7000,  2290, 1790, 1590, 1390);
-            case "14 plus"    -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
-            case "14 pro"     -> new BalloonPrice(9000,  2890, 2290, 1990, 1790);
-            case "14 pro max" -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
-            case "15"         -> new BalloonPrice(10000, 3190, 2590, 2190, 1990);
-            case "15 plus"    -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
-            case "15 pro"     -> new BalloonPrice(12000, 3850, 3050, 2550, 2350);
-            case "15 pro max" -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
-            case "16e"        -> new BalloonPrice(8000,  2550, 2050, 1750, 1550);
-            case "16"         -> new BalloonPrice(11000, 3550, 2750, 2350, 2150);
-            case "16 plus"    -> new BalloonPrice(13000, 4190, 3290, 2790, 2490);
-            case "16 pro"     -> new BalloonPrice(15000, 4790, 3790, 3290, 2890);
-            case "16 pro max" -> new BalloonPrice(18000, 5690, 4590, 3990, 3490);
-            case "17"         -> new BalloonPrice(16000, 5090, 3990, 3490, 3090);
-            case "17 air"     -> new BalloonPrice(15000, 4790, 3790, 3290, 2890);
-            case "17 pro"     -> new BalloonPrice(21000, 6690, 5290, 4620, 4190);
-            case "17 pro max" -> new BalloonPrice(25000, 7990, 6290, 5390, 4790);
+            //                    รับซื้อ     6     8     10    12    15    18    21    24
+            case "12"         -> price(3500,  1190,  890,  790,  690);   // เรทเดิม
+            case "12 pro"     -> price(4000,  1290, 1090,  890,  790);   // เรทเดิม
+            case "12 pro max" -> price(4000,  1290, 1090,  890,  790);   // เรทเดิม
+            case "13 mini"    -> price(3500,  1190,  890,  790,  690);
+            case "13"         -> price(5000,  1590, 1290, 1090,  990);
+            case "13 pro"     -> price(7000,  2290, 1790, 1590, 1390,  950);
+            case "13 pro max" -> price(9000,  2890, 2290, 1990, 1790, 1190);
+            case "14"         -> price(7000,  2290, 1790, 1590, 1390, 1490, 1290);
+            case "14 plus"    -> price(9000,  2890, 2290, 1990, 1790, 1250, 1050);
+            case "14 pro"     -> price(9000,  2890, 2290, 1990, 1790, 1490, 1290);
+            case "14 pro max" -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
+            case "15"         -> price(10000, 3190, 2590, 2190, 1990, 1590, 1390);
+            case "15 plus"    -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
+            case "15 pro"     -> price(12000, 3850, 3050, 2550, 2350, 1950, 1650);
+            case "15 pro max" -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
+            case "16"         -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
+            case "16e"        -> price(8000,  2550, 2050, 1750, 1550, 1250, 1050);
+            case "16 plus"    -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
+            case "16 pro"     -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
+            case "16 pro max" -> price(18000, 5690, 4590, 3990, 3490, 2890, 2490, 2190, 1990);
+            case "17"         -> price(16000, 5090, 3990, 3490, 3090, 2590, 2290, 1990, 1790);
+            case "17 air"     -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
+            case "17 pro"     -> price(21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350);
+            case "17 pro max" -> price(25000, 8350, 6550, 5550, 4790, 3990, 3490, 3090, 2790);
             default -> null;
         };
     }
 
+    /**
+     * สร้างราคา 1 รุ่นจากตัวเลขที่อ่านจากตารางซ้ายไปขวา
+     * ใส่กี่ตัวก็ได้ (4-8 ตัว) ระบบจะจับคู่กับงวดใน INSTALLMENT_MONTHS ตามลำดับให้เอง
+     */
+    private static BalloonPrice price(int buyPrice, int... monthlyAmounts) {
+        if (monthlyAmounts.length == 0 || monthlyAmounts.length > INSTALLMENT_MONTHS.size()) {
+            throw new IllegalArgumentException("จำนวนงวดต้องอยู่ระหว่าง 1-" + INSTALLMENT_MONTHS.size() + " ค่า");
+        }
+        LinkedHashMap<Integer, Integer> payments = new LinkedHashMap<>();
+        for (int i = 0; i < monthlyAmounts.length; i++) {
+            payments.put(INSTALLMENT_MONTHS.get(i), monthlyAmounts[i]);
+        }
+        return new BalloonPrice(buyPrice, payments);
+    }
+
+    /**
+     * เดารุ่นจากข้อความดิบ ใช้เป็นตาข่ายรับเมื่อ AI สกัดรุ่นไม่ได้ (OpenAI ล่ม / ตอบ unknown)
+     *
+     * ⚠️ ของเดิมเทียบ msg.contains("pro max") กับข้อความที่ยังไม่ได้ lowercase
+     *    ลูกค้าพิมพ์ "13 Pro Max" (ตัวใหญ่ตามปกติ) จะกลายเป็นรุ่น "13" เฉยๆ
+     *    → เสนอราคาผิดเป็น 5,000 แทนที่จะเป็น 9,000
+     *    และเช็ค contains("p") ก่อน "plus" ทำให้ "14 Plus" กลายเป็น "14 Pro" อีกด้วย
+     *    (บั๊กนี้เจอตอนยิง response ทดสอบ ไม่ได้เกิดจากการแก้ราคารอบนี้)
+     */
+    private String guessModelFromRawMessage(String msg) {
+        String m = msg.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+        if (!m.matches("^1[1-7].*")) return null;
+
+        String base = m.substring(0, 2);
+        // เรียงจากคำเฉพาะเจาะจงที่สุดก่อน — "plus" ต้องมาก่อน "p" ไม่งั้นกลายเป็น Pro
+        if (base.equals("16") && m.matches("^16\\s*e\\b.*")) return "16e";
+        if (m.contains("pro max") || m.contains("promax") || m.contains("pm")) return base + " Pro Max";
+        if (m.contains("plus")) return base + " Plus";
+        if (m.contains("mini")) return base + " mini";
+        if (m.contains("air")) return base + " Air";
+        if (m.contains("pro") || m.matches("^1[1-7]\\s*p\\b.*")) return base + " Pro";
+        return base;
+    }
+
+    /**
+     * ปรับชื่อรุ่นให้ตรงกับคีย์ในตารางราคา
+     * รองรับที่ลูกค้า/AI ส่งมาหลายแบบ เช่น "iPhone 15 Pro", "iphone15pro" (ติดกัน), "13 ProMax"
+     */
+    private String normalizeModelName(String modelName) {
+        return modelName.toLowerCase(Locale.ROOT)
+                .replace("iphone", " ")
+                .replace("ไอโฟน", " ")
+                .replace("promax", "pro max")
+                // เติมช่องว่างให้ "15pro" → "15 pro" (ระวังอย่าแตะ 16e ที่ต้องติดกัน)
+                .replaceAll("(?<=\\d)(pro|plus|mini|air)", " $1")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+
+    // ==========================================
+    // 🔢 Helper: อ่าน "จำนวนงวด" ที่ลูกค้าพิมพ์มา
+    //
+    // เดิมใช้ msg.matches(".*(6|8|10|12|หก|แปด|สิบ).*") ซึ่งพังหลายทาง:
+    //   - "16" มีเลข 6 อยู่ข้างใน → ถูกนับเป็นเลือก 6 งวด
+    //   - งวดใหม่ 15/18/21/24 ไม่ถูกรับเลย
+    //   - รับทุกเลขโดยไม่สนว่ารุ่นนั้นเปิดให้ผ่อนกี่งวด (13 mini ตอบ 24 ก็ผ่าน)
+    // ของใหม่: ตัดเป็นก้อนตัวเลขเต็มๆ แล้วเทียบกับงวดที่ "รุ่นนี้" มีจริงเท่านั้น
+    // ==========================================
+    private Integer parseSelectedMonth(String message, BalloonPrice price) {
+        if (message == null || price == null) return null;
+        String normalized = normalizeThaiDigits(message);
+
+        Matcher matcher = NUMBER_PATTERN.matcher(normalized);
+        while (matcher.find()) {
+            try {
+                int months = Integer.parseInt(matcher.group());
+                if (price.supportsMonth(months)) return months;
+            } catch (NumberFormatException ignored) {
+                // ตัวเลขยาวเกิน int → ไม่ใช่จำนวนงวดแน่นอน ข้ามไป
+            }
+        }
+
+        // คำไทย: เจอคำแรก (คำยาวสุด) แล้วจบ — ถ้ารุ่นนี้ไม่มีงวดนั้นให้ตอบว่าเลือกไม่ได้ไปเลย
+        // อย่าไล่ต่อ ไม่งั้นลูกค้าขอ "สิบห้า" ในรุ่นที่ไม่มี 15 งวด จะกลายเป็นถูกลดให้เหลือ "สิบ" = 10 งวด
+        for (Map.Entry<String, Integer> entry : THAI_MONTH_WORDS.entrySet()) {
+            if (normalized.contains(entry.getKey())) {
+                return price.supportsMonth(entry.getValue()) ? entry.getValue() : null;
+            }
+        }
+        return null;
+    }
+
+    /** "6, 8, 10, 12, 15, 18, 21 หรือ 24" — ไล่เฉพาะงวดที่รุ่นนั้นเปิดให้เลือก */
+    private String formatMonthChoices(BalloonPrice price) {
+        List<Integer> months = new ArrayList<>(price.monthlyPayments().keySet());
+        if (months.size() == 1) return String.valueOf(months.get(0));
+        String allButLast = months.subList(0, months.size() - 1).stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(", "));
+        return allButLast + " หรือ " + months.get(months.size() - 1);
+    }
+
+    private String formatBaht(int amount) {
+        return String.format("%,d", amount);
+    }
+
+    private String normalizeThaiDigits(String value) {
+        return value.replace('๐', '0').replace('๑', '1').replace('๒', '2').replace('๓', '3').replace('๔', '4')
+                .replace('๕', '5').replace('๖', '6').replace('๗', '7').replace('๘', '8').replace('๙', '9');
+    }
+
+    private static Map<String, Integer> buildThaiMonthWords() {
+        LinkedHashMap<String, Integer> words = new LinkedHashMap<>();
+        words.put("ยี่สิบสี่", 24);
+        words.put("ยี่สิบเอ็ด", 21);
+        words.put("สิบแปด", 18);
+        words.put("สิบห้า", 15);
+        words.put("สิบสอง", 12);
+        words.put("สิบ", 10);
+        words.put("แปด", 8);
+        words.put("หก", 6);
+        return Collections.unmodifiableMap(words);
+    }
 
     private boolean isBusinessHours() {
         LocalTime now = LocalTime.now(BANGKOK_ZONE);

@@ -112,6 +112,28 @@ class BalloonFlowServiceTests {
     }
 
     @Test
+    void modelIsGuessedFromRawMessageWhenAiExtractionFails() {
+        // AI ล่ม/ตอบ unknown → ต้องเดารุ่นจากข้อความให้ครบทั้งรุ่นย่อย ไม่ใช่เหลือแต่เลขรุ่น
+        // (ถ้าเหลือแค่ "13" ลูกค้าจะโดนเสนอราคา 5,000 แทน 9,000)
+        when(aiDataExtractorService.extractInfo(anyString(), any()))
+                .thenReturn(new ExtractedData("unknown", 0, "unknown", "unknown"));
+
+        assertThat(modelFor("13 Pro Max")).isEqualTo("13 Pro Max");
+        assertThat(modelFor("14 Plus")).isEqualTo("14 Plus");
+        assertThat(modelFor("13 Mini")).isEqualTo("13 mini");
+        assertThat(modelFor("17 Air")).isEqualTo("17 Air");
+        assertThat(modelFor("16E")).isEqualTo("16e");
+        assertThat(modelFor("15 PRO")).isEqualTo("15 Pro");
+        assertThat(modelFor("16")).isEqualTo("16");
+    }
+
+    private String modelFor(String customerMessage) {
+        UserState user = newUser("U-guess", "STEP_2_CAPACITY");
+        service.processMessage(user, customerMessage);
+        return user.getDeviceModel();
+    }
+
+    @Test
     void secondInvalidIphoneModelEscalatesToAdminMode() {
         when(aiDataExtractorService.extractInfo(anyString(), any()))
                 .thenReturn(new ExtractedData("unknown", 0, "unknown", "unknown"));
