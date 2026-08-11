@@ -102,14 +102,14 @@ public class ChatFlowManager {
         }
 
         // 🧭 ลูกค้า "กำลังคุยค้างอยู่กลาง flow" อยู่หรือเปล่า
-        // ใช้ตัดสินว่าข้อความนี้ควรถูกดักด้วยคีย์เวิร์ดกลางๆ (รุ่นต่ำกว่า 12 / จำนำ / สนใจผ่อน)
+        // ใช้ตัดสินว่าข้อความนี้ควรถูกดักด้วยคีย์เวิร์ดกลางๆ (รุ่นต่ำกว่า 13 / จำนำ / สนใจผ่อน)
         // หรือควรปล่อยให้ flow ที่ค้างอยู่เป็นคนตอบ
         boolean isFlowInProgress = isFlowInProgress(userState);
 
         // ⚠️ ดักเฉพาะตอนที่ยังไม่ได้อยู่กลาง flow — ถ้าอยู่กลาง flow ให้ BalloonFlowService
         // เป็นคนเช็คเองตาม step (STEP_2_CAPACITY) จะได้ไม่ไปกินคำตอบของ step อื่น
-        if (!isFlowInProgress && IphoneModelPolicy.isUnsupportedBelowIphone12Message(msgLower)) {
-            return IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
+        if (!isFlowInProgress && IphoneModelPolicy.isUnsupportedBelowIphone13Message(msgLower)) {
+            return IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_13_MESSAGE;
         }
 
         // 🔒 สนใจจำนำ iCloud → ส่งต่อให้แอดมินรับช่วงต่อทันที (ไม่มี flow อัตโนมัติ)

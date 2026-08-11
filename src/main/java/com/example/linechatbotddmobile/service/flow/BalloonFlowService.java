@@ -133,9 +133,9 @@ public class BalloonFlowService implements ServiceFlowHandler {
             // ══════════════════════════════════════════════════════════
             case "STEP_2_CAPACITY": // รับรุ่น → ถามความจุ
                 // ══════════════════════════════════════════════════════════
-                if (IphoneModelPolicy.isUnsupportedBelowIphone12Message(msg)) {
+                if (IphoneModelPolicy.isUnsupportedBelowIphone13Message(msg)) {
                     userState.setRetryCount(0);
-                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
+                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_13_MESSAGE;
                     break;
                 }
 
@@ -151,9 +151,9 @@ public class BalloonFlowService implements ServiceFlowHandler {
                     break;
                 }
 
-                if (IphoneModelPolicy.isUnsupportedBelowIphone12Model(extractedModel)) {
+                if (IphoneModelPolicy.isUnsupportedBelowIphone13Model(extractedModel)) {
                     userState.setRetryCount(0);
-                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_12_MESSAGE;
+                    responseMessage = IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_13_MESSAGE;
                     break;
                 }
 
@@ -534,38 +534,36 @@ public class BalloonFlowService implements ServiceFlowHandler {
     //    ลำดับตัวเลขหลัง "รับซื้อ" = งวด 6, 8, 10, 12, 15, 18, 21, 24 (INSTALLMENT_MONTHS)
     //    ใส่เท่าที่รุ่นนั้นมีในตาราง แล้วหยุด — รุ่นที่ตารางเว้นว่างไว้จะไม่ถูกเสนอให้ลูกค้าเลือก
     //
-    //    ℹ️ iPhone 12 ไม่มีอยู่ในตารางราคาใบใหม่ แต่ทางร้านยังรับอยู่ จึงคงเรทเดิมไว้
-    //       (มีแค่งวด 6-12 เหมือนเดิม ไม่ได้เปิดงวดยาว 15/18/21/24 ให้)
+    //    ⚠️ ราคาชุดนี้ generate จากไฟล์ iphone_balloon_installments.csv ที่ร้านส่งมา (ไม่ได้พิมพ์มือ)
+    //       ทางร้านรับตั้งแต่ 13 mini ขึ้นไป — iPhone 12 ลงมาถูกคัดออกตั้งแต่ IphoneModelPolicy แล้ว
     // ══════════════════════════════════════════════════════════════════════
     private BalloonPrice getPriceForModel(String modelName) {
         if (modelName == null || modelName.trim().isEmpty()) return null;
         String m = normalizeModelName(modelName);
         return switch (m) {
             //                    รับซื้อ     6     8     10    12    15    18    21    24
-            case "12"         -> price(3500,  1190,  890,  790,  690);   // เรทเดิม
-            case "12 pro"     -> price(4000,  1290, 1090,  890,  790);   // เรทเดิม
-            case "12 pro max" -> price(4000,  1290, 1090,  890,  790);   // เรทเดิม
-            case "13 mini"    -> price(3500,  1190,  890,  790,  690);
-            case "13"         -> price(5000,  1590, 1290, 1090,  990);
-            case "13 pro"     -> price(7000,  2290, 1790, 1590, 1390,  950);
-            case "13 pro max" -> price(9000,  2890, 2290, 1990, 1790, 1190);
-            case "14"         -> price(7000,  2290, 1790, 1590, 1390, 1490, 1290);
-            case "14 plus"    -> price(9000,  2890, 2290, 1990, 1790, 1250, 1050);
-            case "14 pro"     -> price(9000,  2890, 2290, 1990, 1790, 1490, 1290);
-            case "14 pro max" -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
-            case "15"         -> price(10000, 3190, 2590, 2190, 1990, 1590, 1390);
-            case "15 plus"    -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
-            case "15 pro"     -> price(12000, 3850, 3050, 2550, 2350, 1950, 1650);
-            case "15 pro max" -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
-            case "16"         -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
-            case "16e"        -> price(8000,  2550, 2050, 1750, 1550, 1250, 1050);
-            case "16 plus"    -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
-            case "16 pro"     -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
-            case "16 pro max" -> price(18000, 5690, 4590, 3990, 3490, 2890, 2490, 2190, 1990);
-            case "17"         -> price(16000, 5090, 3990, 3490, 3090, 2590, 2290, 1990, 1790);
-            case "17 air"     -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
-            case "17 pro"     -> price(21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350);
-            case "17 pro max" -> price(25000, 8350, 6550, 5550, 4790, 3990, 3490, 3090, 2790);
+            case "13 mini"      -> price(3000,  1190,  890,  790,  690);
+            case "13"           -> price(4000,  1290, 1090,  890,  790);
+            case "13 pro"       -> price(5000,  1590, 1290, 1090,  990);
+            case "13 pro max"   -> price(7000,  2290, 1790, 1590, 1390, 1090);
+            case "14"           -> price(6000,  1990, 1590, 1390, 1190,  990);
+            case "14 plus"      -> price(7000,  2290, 1790, 1590, 1490, 1390, 1290);
+            case "14 pro"       -> price(7000,  2290, 1790, 1590, 1490, 1390, 1290);
+            case "14 pro max"   -> price(10000, 3190, 2590, 2190, 1990, 1590, 1390);
+            case "15"           -> price(8000,  2550, 2050, 1750, 1550, 1250, 1050);
+            case "15 plus"      -> price(10000, 3190, 2590, 2190, 1990, 1590, 1390);
+            case "15 pro"       -> price(12000, 3850, 3050, 2550, 2350, 1950, 1650);
+            case "15 pro max"   -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
+            case "16"           -> price(9000,  2890, 2290, 1990, 1790, 1490, 1290);
+            case "16e"          -> price(7000,  2290, 1790, 1590, 1490, 1390, 1290);
+            case "16 plus"      -> price(11000, 3550, 2750, 2350, 2150, 1750, 1550);
+            case "16 pro"       -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
+            case "16 pro max"   -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
+            case "17"           -> price(13000, 4190, 3290, 2790, 2490, 2090, 1790);
+            case "17e"          -> price(7000,  2290, 1790, 1590, 1490, 1390, 1290);
+            case "17 air"       -> price(12000, 3850, 3050, 2550, 2350, 1950, 1650);
+            case "17 pro"       -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
+            case "17 pro max"   -> price(21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350);
             default -> null;
         };
     }
@@ -600,7 +598,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
         String base = m.substring(0, 2);
         // เรียงจากคำเฉพาะเจาะจงที่สุดก่อน — "plus" ต้องมาก่อน "p" ไม่งั้นกลายเป็น Pro
-        if (base.equals("16") && m.matches("^16\\s*e\\b.*")) return "16e";
+        if (m.matches("^1[67]\\s*e\\b.*")) return base + "e";   // 16e / 17e
         if (m.contains("pro max") || m.contains("promax") || m.contains("pm")) return base + " Pro Max";
         if (m.contains("plus")) return base + " Plus";
         if (m.contains("mini")) return base + " mini";

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 /**
  * ล็อกตารางราคาผ่อนบอลลูนให้ตรงกับตารางของร้านแบบตัวต่อตัว
  *
- * ตัวเลขในคลาสนี้คัดมาจากตารางราคาที่ร้านให้มาโดยตรง (13 mini → 17 Pro Max)
+ * ตัวเลขในคลาสนี้คัดมาจาก iphone_balloon_installments.csv ที่ร้านส่งมา (13 mini → 17 Pro Max, 22 รุ่น)
  * ถ้าใครแก้ราคาในโค้ดผิดตัวเดียว เทสต์นี้จะจับได้ทันทีว่ารุ่นไหน งวดไหน
  *
  * รูปแบบ: { รับซื้อ, 6, 8, 10, 12, 15, 18, 21, 24 } — ใส่เท่าที่รุ่นนั้นมีในตาราง
@@ -35,32 +35,29 @@ class BalloonPriceTableTests {
     private static final Map<String, int[]> SHOP_PRICE_TABLE = new LinkedHashMap<>();
 
     static {
-        // iPhone 12 ไม่ได้อยู่ในตารางใบใหม่ แต่ร้านยังรับอยู่ → คงเรทเดิม (งวด 6-12 เท่านั้น)
-        SHOP_PRICE_TABLE.put("12",         new int[]{3500,  1190,  890,  790,  690});
-        SHOP_PRICE_TABLE.put("12 Pro",     new int[]{4000,  1290, 1090,  890,  790});
-        SHOP_PRICE_TABLE.put("12 Pro Max", new int[]{4000,  1290, 1090,  890,  790});
-
-        SHOP_PRICE_TABLE.put("13 mini",    new int[]{3500,  1190,  890,  790,  690});
-        SHOP_PRICE_TABLE.put("13",         new int[]{5000,  1590, 1290, 1090,  990});
-        SHOP_PRICE_TABLE.put("13 Pro",     new int[]{7000,  2290, 1790, 1590, 1390,  950});
-        SHOP_PRICE_TABLE.put("13 Pro Max", new int[]{9000,  2890, 2290, 1990, 1790, 1190});
-        SHOP_PRICE_TABLE.put("14",         new int[]{7000,  2290, 1790, 1590, 1390, 1490, 1290});
-        SHOP_PRICE_TABLE.put("14 Plus",    new int[]{9000,  2890, 2290, 1990, 1790, 1250, 1050});
-        SHOP_PRICE_TABLE.put("14 Pro",     new int[]{9000,  2890, 2290, 1990, 1790, 1490, 1290});
-        SHOP_PRICE_TABLE.put("14 Pro Max", new int[]{11000, 3550, 2750, 2350, 2150, 1750, 1550});
-        SHOP_PRICE_TABLE.put("15",         new int[]{10000, 3190, 2590, 2190, 1990, 1590, 1390});
-        SHOP_PRICE_TABLE.put("15 Plus",    new int[]{11000, 3550, 2750, 2350, 2150, 1750, 1550});
+        // ตัวเลขทั้งบล็อกนี้ generate จาก iphone_balloon_installments.csv โดยตรง — ห้ามพิมพ์มือ
+        SHOP_PRICE_TABLE.put("13 mini",    new int[]{3000,  1190,  890,  790,  690});
+        SHOP_PRICE_TABLE.put("13",         new int[]{4000,  1290, 1090,  890,  790});
+        SHOP_PRICE_TABLE.put("13 Pro",     new int[]{5000,  1590, 1290, 1090,  990});
+        SHOP_PRICE_TABLE.put("13 Pro Max", new int[]{7000,  2290, 1790, 1590, 1390, 1090});
+        SHOP_PRICE_TABLE.put("14",         new int[]{6000,  1990, 1590, 1390, 1190,  990});
+        SHOP_PRICE_TABLE.put("14 Plus",    new int[]{7000,  2290, 1790, 1590, 1490, 1390, 1290});
+        SHOP_PRICE_TABLE.put("14 Pro",     new int[]{7000,  2290, 1790, 1590, 1490, 1390, 1290});
+        SHOP_PRICE_TABLE.put("14 Pro Max", new int[]{10000, 3190, 2590, 2190, 1990, 1590, 1390});
+        SHOP_PRICE_TABLE.put("15",         new int[]{8000,  2550, 2050, 1750, 1550, 1250, 1050});
+        SHOP_PRICE_TABLE.put("15 Plus",    new int[]{10000, 3190, 2590, 2190, 1990, 1590, 1390});
         SHOP_PRICE_TABLE.put("15 Pro",     new int[]{12000, 3850, 3050, 2550, 2350, 1950, 1650});
         SHOP_PRICE_TABLE.put("15 Pro Max", new int[]{13000, 4190, 3290, 2790, 2490, 2090, 1790});
-        SHOP_PRICE_TABLE.put("16",         new int[]{11000, 3550, 2750, 2350, 2150, 1750, 1550});
-        SHOP_PRICE_TABLE.put("16e",        new int[]{8000,  2550, 2050, 1750, 1550, 1250, 1050});
-        SHOP_PRICE_TABLE.put("16 Plus",    new int[]{13000, 4190, 3290, 2790, 2490, 2090, 1790});
-        SHOP_PRICE_TABLE.put("16 Pro",     new int[]{15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690});
-        SHOP_PRICE_TABLE.put("16 Pro Max", new int[]{18000, 5690, 4590, 3990, 3490, 2890, 2490, 2190, 1990});
-        SHOP_PRICE_TABLE.put("17",         new int[]{16000, 5090, 3990, 3490, 3090, 2590, 2290, 1990, 1790});
-        SHOP_PRICE_TABLE.put("17 Air",     new int[]{15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690});
-        SHOP_PRICE_TABLE.put("17 Pro",     new int[]{21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350});
-        SHOP_PRICE_TABLE.put("17 Pro Max", new int[]{25000, 8350, 6550, 5550, 4790, 3990, 3490, 3090, 2790});
+        SHOP_PRICE_TABLE.put("16",         new int[]{9000,  2890, 2290, 1990, 1790, 1490, 1290});
+        SHOP_PRICE_TABLE.put("16e",        new int[]{7000,  2290, 1790, 1590, 1490, 1390, 1290});
+        SHOP_PRICE_TABLE.put("16 Plus",    new int[]{11000, 3550, 2750, 2350, 2150, 1750, 1550});
+        SHOP_PRICE_TABLE.put("16 Pro",     new int[]{13000, 4190, 3290, 2790, 2490, 2090, 1790});
+        SHOP_PRICE_TABLE.put("16 Pro Max", new int[]{15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690});
+        SHOP_PRICE_TABLE.put("17",         new int[]{13000, 4190, 3290, 2790, 2490, 2090, 1790});
+        SHOP_PRICE_TABLE.put("17e",        new int[]{7000,  2290, 1790, 1590, 1490, 1390, 1290});
+        SHOP_PRICE_TABLE.put("17 Air",     new int[]{12000, 3850, 3050, 2550, 2350, 1950, 1650});
+        SHOP_PRICE_TABLE.put("17 Pro",     new int[]{15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690});
+        SHOP_PRICE_TABLE.put("17 Pro Max", new int[]{21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350});
     }
 
     private UserStateRepository userStateRepository;
@@ -125,7 +122,7 @@ class BalloonPriceTableTests {
     @Test
     void flagshipModelsOfferAllEightTenors() {
         assertThat(quoteFor("17 Pro Max"))
-                .contains("- 24 เดือน: งวดละ 2,790 บ.")
+                .contains("- 24 เดือน: งวดละ 2,350 บ.")
                 .contains("(พิมพ์ตัวเลข 6, 8, 10, 12, 15, 18, 21 หรือ 24 ได้เลยครับ)");
     }
 
@@ -134,10 +131,11 @@ class BalloonPriceTableTests {
         // AI/ลูกค้าส่งชื่อรุ่นมาได้หลายแบบ ต้องเจอราคาเดียวกันหมด
         assertThat(quoteFor("iPhone 15 Pro")).contains("ยอดรับซื้อ: 12,000 บ.");
         assertThat(quoteFor("15 promax")).contains("ยอดรับซื้อ: 13,000 บ.");
-        assertThat(quoteFor("16E")).contains("ยอดรับซื้อ: 8,000 บ.");
-        assertThat(quoteFor("  17   Pro  ")).contains("ยอดรับซื้อ: 21,000 บ.");
+        assertThat(quoteFor("16E")).contains("ยอดรับซื้อ: 7,000 บ.");
+        assertThat(quoteFor("  17   Pro  ")).contains("ยอดรับซื้อ: 15,000 บ.");
         assertThat(quoteFor("iphone15promax")).contains("ยอดรับซื้อ: 13,000 บ."); // พิมพ์ติดกันหมด
-        assertThat(quoteFor("16e")).contains("ยอดรับซื้อ: 8,000 บ.");            // 16e ต้องไม่ถูกแยกเป็น "16 e"
+        assertThat(quoteFor("16e")).contains("ยอดรับซื้อ: 7,000 บ.");            // 16e ต้องไม่ถูกแยกเป็น "16 e"
+        assertThat(quoteFor("17E")).contains("ยอดรับซื้อ: 7,000 บ.");            // รุ่นใหม่ในตาราง
     }
 
     @Test
@@ -154,19 +152,19 @@ class BalloonPriceTableTests {
     }
 
     @Test
-    void iphone12KeepsItsLegacyRateWithShortTenorsOnly() {
-        // ร้านยังรับ 12 อยู่ที่เรทเดิม และไม่ได้เปิดงวดยาวให้
-        assertThat(quoteFor("12 Pro Max"))
-                .contains("ยอดรับซื้อ: 4,000 บ.")
-                .contains("- 12 เดือน: งวดละ 790 บ.")
-                .doesNotContain("15 เดือน")
-                .contains("(พิมพ์ตัวเลข 6, 8, 10 หรือ 12 ได้เลยครับ)");
+    void midRangeModelsStopAtEighteenMonths() {
+        // งวด 21/24 เปิดให้เฉพาะ 16 Pro Max / 17 Pro / 17 Pro Max เท่านั้น
+        assertThat(quoteFor("17"))
+                .contains("- 18 เดือน: งวดละ 1,790 บ.")
+                .doesNotContain("21 เดือน")
+                .doesNotContain("24 เดือน")
+                .contains("(พิมพ์ตัวเลข 6, 8, 10, 12, 15 หรือ 18 ได้เลยครับ)");
     }
 
     @Test
     void modelOutsideThePriceTableIsHandedToAdminInsteadOfGuessing() {
-        // 12 mini ไม่มีในตารางราคาทั้งใบเก่าและใบใหม่ — บอทต้องไม่เดาราคาเอง
-        UserState user = pricingUser("12 mini");
+        // 12 Pro Max ถูกถอดออกจากตารางแล้ว (ร้านรับ 13 ขึ้นไป) — บอทต้องไม่เดาราคาเอง
+        UserState user = pricingUser("12 Pro Max");
 
         String reply = service.processMessage(user, "continue");
 
@@ -191,7 +189,7 @@ class BalloonPriceTableTests {
         assertThat(reply).isNotBlank();
         verify(lineMessageService).sendSuccessCard(
                 anyString(), anyString(), anyString(), anyString(), anyString(),
-                org.mockito.ArgumentMatchers.contains("24 เดือน (งวดละ 2,790 บ.)"));
+                org.mockito.ArgumentMatchers.contains("24 เดือน (งวดละ 2,350 บ.)"));
     }
 
     @Test
@@ -228,7 +226,7 @@ class BalloonPriceTableTests {
         assertThat(user.getCurrentState()).isEqualTo("ADMIN_MODE");
         verify(lineMessageService).sendSuccessCard(
                 anyString(), anyString(), anyString(), anyString(), anyString(),
-                org.mockito.ArgumentMatchers.contains("18 เดือน (งวดละ 2,090 บ.)"));
+                org.mockito.ArgumentMatchers.contains("18 เดือน (งวดละ 1,790 บ.)"));
     }
 
     // --- helpers ---
