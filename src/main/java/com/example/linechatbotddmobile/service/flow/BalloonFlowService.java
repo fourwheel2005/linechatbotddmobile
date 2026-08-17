@@ -56,6 +56,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
     private static final String MIRROR_PHOTO_GUIDE_IMAGE_URL =
             "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/mirror-photo-guide.jpg";
 
+    // ⚙️ คู่มือ "วิธีแคปสเปคเครื่อง" (การตั้งค่า > ทั่วไป > เกี่ยวกับ) ส่งคู่กับคำถามใน STEP_9_APPROVED_PHOTO
+    private static final String SPEC_SCREENSHOT_GUIDE_IMAGE_URL =
+            "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/S__11976713.jpg";
+
     // 📅 งวดผ่อนทั้งหมดที่ทางร้านเปิดให้ เรียงจากสั้นไปยาว
     //    ใช้เป็น "หัวตาราง" ของ price() — ค่าที่ส่งเข้ามาจะไล่ตามลำดับนี้ซ้ายไปขวาเหมือนอ่านตารางราคา
     private static final List<Integer> INSTALLMENT_MONTHS = List.of(6, 8, 10, 12, 15, 18, 21, 24);
@@ -356,8 +360,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "STEP_9_APPROVED_PHOTO": // แอดมินกดผ่านรูปภาพ
                 userState.setCurrentState("STEP_10_NAME");
 
-                String exampleImageUrl2 = "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/capsystem.jpg";
-                lineMessageService.sendImage(userId, exampleImageUrl2);
+                lineMessageService.sendImage(userId, SPEC_SCREENSHOT_GUIDE_IMAGE_URL);
 
                 responseMessage = "แอดมินตรวจสอบรูปรอบเครื่องผ่านเรียบร้อยครับ สวยมากครับ! ✨\n\n" +
                         "ถัดไป รบกวนลูกค้า **แคปหน้าจอ 'การตั้งค่า > ทั่วไป > เกี่ยวกับ'**\n" +
