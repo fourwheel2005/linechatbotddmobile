@@ -8,6 +8,7 @@ import com.example.linechatbotddmobile.service.line.LineMessageService;
 import com.example.linechatbotddmobile.service.line.LineProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,6 +114,25 @@ class BalloonPriceTableTests {
     }
 
     @Test
+    void everyModelReturnsTheExactCustomerResponse() {
+        SHOP_PRICE_TABLE.forEach((model, row) ->
+                assertThat(quoteFor(model))
+                        .as("response เต็มของ %s", model)
+                        .isEqualTo(expectedQuote(model, row)));
+    }
+
+    @Test
+    void thirteenProMaxNeverReturnsThePreviousRate() {
+        String quote = quoteFor("13 Pro Max");
+
+        assertThat(quote)
+                .contains("ยอดรับซื้อ: 7,000 บ.")
+                .doesNotContain("ยอดรับซื้อ: 9,000 บ.")
+                .doesNotContain("- 6 เดือน: งวดละ 2,890 บ.")
+                .doesNotContain("- 15 เดือน: งวดละ 1,190 บ.");
+    }
+
+    @Test
     void smallModelsOnlyOfferShortTenors() {
         assertThat(quoteFor("13 mini"))
                 .contains("- 12 เดือน: งวดละ 690 บ.")
@@ -193,6 +214,28 @@ class BalloonPriceTableTests {
     }
 
     @Test
+    void everySupportedTenorSendsTheExactPriceToAdmin() {
+        SHOP_PRICE_TABLE.forEach((model, row) -> {
+            for (int i = 1; i < row.length; i++) {
+                clearInvocations(lineMessageService);
+                int months = ALL_MONTHS.get(i - 1);
+
+                UserState user = monthSelectionUser(model);
+                service.processMessage(user, months + " เดือน");
+
+                ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+                verify(lineMessageService).sendSuccessCard(
+                        anyString(), anyString(), anyString(), anyString(), anyString(), details.capture());
+                assertThat(details.getValue())
+                        .as("ราคาใน admin card ของ %s งวด %d เดือน", model, months)
+                        .isEqualTo("รุ่น: " + model + " 256GB\n"
+                                + "ลูกค้าเลือกระยะเวลา: " + months + " เดือน"
+                                + " (งวดละ " + baht(row[i]) + " บ.)");
+            }
+        });
+    }
+
+    @Test
     void tenorThatTheModelDoesNotOfferIsRejected() {
         // 13 mini มีแค่ 6-12 งวด → ขอ 24 งวดไม่ได้
         UserState user = monthSelectionUser("13 mini");
@@ -253,5 +296,29 @@ class BalloonPriceTableTests {
 
     private static String baht(int amount) {
         return String.format("%,d", amount);
+    }
+
+    private static String expectedQuote(String model, int[] row) {
+        StringBuilder expected = new StringBuilder()
+                .append("ข้อเสนอสำหรับ **iPhone ").append(model).append("** มาแล้วครับ! 🎉\n")
+                .append("- ยอดรับซื้อ: ").append(baht(row[0])).append(" บ.\n");
+        for (int i = 1; i < row.length; i++) {
+            expected.append("- ").append(ALL_MONTHS.get(i - 1)).append(" เดือน: งวดละ ")
+                    .append(baht(row[i])).append(" บ.\n");
+        }
+        return expected.append("\n👉 ลูกค้าสนใจส่งกี่เดือนดีครับ? (พิมพ์ตัวเลข ")
+                .append(monthChoices(row.length - 1))
+                .append(" ได้เลยครับ)")
+                .toString();
+    }
+
+    private static String monthChoices(int count) {
+        if (count == 1) {
+            return ALL_MONTHS.get(0).toString();
+        }
+        String beginning = ALL_MONTHS.subList(0, count - 1).stream()
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(", "));
+        return beginning + " หรือ " + ALL_MONTHS.get(count - 1);
     }
 }

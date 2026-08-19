@@ -591,7 +591,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
      *
      * ⚠️ ของเดิมเทียบ msg.contains("pro max") กับข้อความที่ยังไม่ได้ lowercase
      *    ลูกค้าพิมพ์ "13 Pro Max" (ตัวใหญ่ตามปกติ) จะกลายเป็นรุ่น "13" เฉยๆ
-     *    → เสนอราคาผิดเป็น 5,000 แทนที่จะเป็น 9,000
+     *    → เสนอเป็นราคา iPhone 13 แทนราคา 13 Pro Max
      *    และเช็ค contains("p") ก่อน "plus" ทำให้ "14 Plus" กลายเป็น "14 Pro" อีกด้วย
      *    (บั๊กนี้เจอตอนยิง response ทดสอบ ไม่ได้เกิดจากการแก้ราคารอบนี้)
      */

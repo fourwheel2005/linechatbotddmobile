@@ -114,7 +114,7 @@ class BalloonFlowServiceTests {
     @Test
     void modelIsGuessedFromRawMessageWhenAiExtractionFails() {
         // AI ล่ม/ตอบ unknown → ต้องเดารุ่นจากข้อความให้ครบทั้งรุ่นย่อย ไม่ใช่เหลือแต่เลขรุ่น
-        // (ถ้าเหลือแค่ "13" ลูกค้าจะโดนเสนอราคา 5,000 แทน 9,000)
+        // (ถ้าเหลือแค่ "13" ลูกค้าจะโดนเสนอราคา 4,000 แทน 7,000)
         when(aiDataExtractorService.extractInfo(anyString(), any()))
                 .thenReturn(new ExtractedData("unknown", 0, "unknown", "unknown"));
 

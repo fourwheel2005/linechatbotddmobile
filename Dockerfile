@@ -20,6 +20,9 @@ RUN ./gradlew clean bootJar --no-daemon
 # --- Stage 2: Runtime ---
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
+ARG APP_BUILD_COMMIT=unknown
+ENV APP_BUILD_COMMIT=${APP_BUILD_COMMIT}
+LABEL org.opencontainers.image.revision=${APP_BUILD_COMMIT}
 RUN useradd -ms /bin/sh javauser
 USER javauser
 COPY --from=build /app/build/libs/*.jar app.jar

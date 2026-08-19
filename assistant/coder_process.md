@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-08-19 — วิเคราะห์ LINE ยังตอบราคาเก่า + เพิ่ม deployment traceability
+
+### Root cause และหลักฐาน
+- Source ปัจจุบันที่ `main`/`origin/main` ระบุ 13 Pro Max = รับซื้อ 7,000 บาท และราคานี้ถูกเพิ่มใน commit `ff84f2a` วันที่ 2026-08-11
+- ข้อความในภาพ LINE ระบุ 9,000 บาท ซึ่งตรงแบบ exact fingerprint กับ source ก่อน commit `ff84f2a` (รวมถึงงวด 6 เดือน 2,890 และ 15 เดือน 1,190)
+- ราคาไม่ได้เก็บใน DB, `UserState`, AI prompt หรือ Flex template; ทุกครั้งที่เข้า `STEP_5_PRICING` จะเรียก `getPriceForModel()` แล้วสร้าง response ใหม่ทันที
+- GitHub Actions ของ commit `ff84f2a` build/push image สำเร็จ แต่ workflow มีเพียง build/push Docker Hub ไม่มีขั้น deploy/pull/restart production ขณะที่ `docker-compose.yaml` ใช้ `build: .` และไม่ได้อ้าง image จาก registry
+- สรุป: จุดผิดอยู่หลัง build registry และก่อน runtime production (production ยังรัน container/JAR เก่า) ไม่ใช่ price mapping หรือ response formatter ใน source ปัจจุบัน
+
+### ไฟล์ที่แก้
+| ไฟล์ | การเปลี่ยนแปลง |
+|---|---|
+| `BalloonPriceTableTests.java` | ตรวจ response เต็มแบบ exact ครบ 22 รุ่น, ล็อกไม่ให้ 13 Pro Max ตอบ fingerprint ราคาเก่า, ตรวจ admin card ครบ 130 model-tenor combinations |
+| `HealthCheckController.java` | เพิ่ม `buildCommit` ใน `/health` เพื่อพิสูจน์ commit ที่ runtime กำลังรัน |
+| `HealthCheckControllerTests.java` | Unit test build identity ใน health response |
+| `.github/workflows/main.yml` | บังคับ test ผ่านก่อน build, tag image ทั้ง `latest` และ commit SHA, ใส่ OCI revision label |
+| `Dockerfile` | ฝัง `APP_BUILD_COMMIT` และ OCI revision ใน runtime image |
+| `BalloonFlowService.java`, `BalloonFlowServiceTests.java` | แก้ comment ตัวอย่างราคาเดิมให้ไม่ขัดกับ rate sheet ปัจจุบัน |
+
+### Design decision
+ใช้ build provenance แบบ commit SHA ซึ่งเป็น immutable identifier เพื่อแยกปัญหา source/build/deploy/runtime ได้ตรงจุด โดยยังคงตารางราคาและ flow เดิมทั้งหมด
+
+**Alternative ที่ไม่ทำ:** เพิ่มราคาใน DB หรือ cache invalidation เพราะหลักฐานยืนยันว่าไม่มี persistence/cache ของราคา และจะเพิ่ม complexity โดยไม่แก้ root cause
+
+### Verification
+- `./gradlew clean test --no-daemon` — 54 tests, 0 failures, 0 errors
+- ตารางราคา: 22 รุ่น, 152 ช่องราคา (22 ราคารับซื้อ + 130 ค่างวด)
+- จำลอง response 13 Pro Max ได้ยอดรับซื้อ 7,000 และงวด 6/8/10/12/15 = 2,290/1,790/1,590/1,390/1,090 บาท
+- Docker build ในเครื่องนี้ตรวจต่อไม่ได้เพราะ Docker daemon ไม่ได้เปิด; Java build/test และ Dockerfile syntax diff ผ่าน `git diff --check`
+
+### Self-review
+- Correctness: ครบ customer response, admin selection, model aliases, unavailable tenor และ stale-rate regression
+- Design: ไม่เพิ่ม abstraction ใน pricing path; build identity แยก concern อยู่ที่ health/build pipeline
+- Security: เปิดเผยเฉพาะ commit SHA ซึ่งไม่ใช่ secret
+- Performance: เพิ่มเพียง string field เดียวใน health response; pricing runtime ไม่เปลี่ยน
+- Regression scope: balloon pricing, admin success card, health endpoint, CI image build
+
 ## 2026-08-11 — ปรับตารางราคาผ่อนบอลลูนตาม CSV ใหม่ + เลิกรับ iPhone 12
 
 ### Requirement
