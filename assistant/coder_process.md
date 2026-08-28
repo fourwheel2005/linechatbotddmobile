@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-08-28 — ซ่อม duplicate UserState + ป้องกัน state race โดยคง Admin handover เดิม
+
+### Requirement
+แก้อาการลูกค้าบางรายได้รับ “ระบบประมวลผลขัดข้องชั่วคราว” ซ้ำทุกข้อความ โดยต้องไม่เปลี่ยน Business rule:
+- `take_case` ปิดบอทและให้แอดมินคุยเอง
+- `resume_bot` กลับ step ที่จำไว้
+- ลูกค้าเก่ายังเริ่ม flow ใหม่ผ่านปุ่มเดิมได้
+
+### Root cause ที่แก้
+`user_states.line_user_id` ไม่มี uniqueness guarantee ขณะที่ message worker ทำงานพร้อมกันได้ จึงสร้าง state ซ้ำได้
+เมื่อ repository ที่ return `Optional<UserState>` พบหลายแถวจะ throw `IncorrectResultSizeDataAccessException` ทั้ง text flow และ admin postback
+
+### ไฟล์หลักที่แก้
+| ไฟล์ | การเปลี่ยนแปลง |
+|---|---|
+| `UserStateIntegrityInitializer.java` | ก่อน app ready: lock ตารางบน PostgreSQL, รวม duplicate, พัก affected user ใน `ADMIN_MODE`, จำ step ที่ไกลที่สุด, สร้าง unique index |
+| `UserStateService.java` | race-safe load-or-create; ถ้าอีก instance insert ชนะให้โหลด row ที่ชนะกลับมา |
+| `UserConversationLockService.java` | reentrant per-user lock ป้องกัน worker ใน instance เดียวแก้บทสนทนาพร้อมกัน และล้าง lock entry เมื่อหมดงาน |
+| `ChatFlowManager.java` | dispatch ทุกข้อความผ่าน per-user lock และ resolver กลาง |
+| `LineWebhookController.java` | panic/postback ใช้ resolver และ lock เดียวกัน; แยก postback action เป็นเมธอดเล็กโดยคงข้อความ/transition เดิม |
+| `CustomerFollowUpReminderScheduler.java` | recheck state ภายใน user lock ก่อนส่ง reminder ป้องกัน stale scheduler save ย้อน flow |
+| tests | เพิ่ม duplicate repair/unique/race/locking/take-case/resume/reminder regression tests |
+
+### Design decisions
+1. **Repair ก่อน enforce:** ใช้ `SmartInitializingSingleton` หลัง JPA สร้าง schema แต่ก่อน application ready เพื่อรองรับฐานเดิมที่มี duplicate อยู่แล้ว
+2. **Fail safe สำหรับข้อมูลเสีย:** รวมค่าที่ไม่ว่างไว้ใน survivor, บังคับ service ของ resumable STEP เป็น `ผ่อนบอลลูน`, ตั้ง `ADMIN_MODE` และเก็บ step ที่เดินไกลที่สุดใน `previousState` เพื่อไม่ให้บอทเดาขั้นตอนแล้วคุยทับแอดมิน
+3. **Database เป็น source of truth:** unique index ป้องกัน duplicate ข้าม process/instance; resolver จัดการ concurrent insert loser โดยไม่ตอบ generic error
+4. **ไม่ถือ DB connection ระหว่าง AI/LINE I/O:** serialize ด้วย bounded in-memory keyed lock สำหรับ deployment ปัจจุบันที่มี app instance เดียว; entry ถูก remove เมื่อไม่มีผู้ใช้ lock จึงไม่โตตามจำนวนลูกค้าตลอดกาล
+5. **Postback reentrant:** controller และ flow ใช้ lock เดียวกันแบบ reentrant จึงอนุมัติแล้วเรียก flow ต่อใน thread เดิมได้โดยไม่ deadlock
+
+### Alternatives ที่ปฏิเสธ
+- เปลี่ยน repository เป็น `List` แล้วหยิบแถวแรก: ซ่อน corruption และปล่อยให้ข้อมูลผิดโตต่อ
+- ใส่ unique annotation อย่างเดียว: deployment แรกอาจสร้าง constraint ไม่ได้เพราะ production มี duplicate เดิม
+- ลบ duplicate แล้วเดิน flow ต่ออัตโนมัติ: เสี่ยงเลือก state ผิดและบอทคุยทับมนุษย์
+- ครอบ flow ทั้งก้อนด้วย DB transaction/advisory transaction lock: ถือ connection ระหว่าง OpenAI/LINE call ขัด performance rule ของโปรเจกต์
+
+### Verification
+- `./gradlew clean build --no-daemon` — **68 tests passed, 0 failed, 0 errors**
+- H2: repair duplicate, merge fields, preserve resume step, idempotent startup และ reject duplicate ใหม่
+- PostgreSQL 14 integration: table lock + repair + unique index ผ่านจริง
+- Full Spring Boot context บน PostgreSQL 14: JPA transaction manager + startup initializer ผ่าน
+- Concurrency: user เดียวกันไม่รันพร้อมกัน, คนละ user ยังขนานได้, nested controller→flow ไม่ deadlock
+- Business regression: take case → `ADMIN_MODE`; resume → previous step; ไม่มี previous → `STEP_1_INFO`; admin mode ยังเงียบ
+- Temporary PostgreSQL test databases ถูกลบหลังทดสอบแล้ว
+
+### Performance / Security self-review
+- Startup scan ทำครั้งเดียวและใช้ index เดิมช่วยหา duplicate ก่อนแทนด้วย unique index; table lock อยู่เฉพาะช่วง migration สั้นๆ ก่อน ready
+- Runtime เพิ่ม map lookup + uncontended lock ต่อข้อความ ไม่มี DB transaction ยาว
+- Lock map มี reference-count cleanup ไม่เกิด unbounded user-key leak
+- Log รายงานเฉพาะจำนวน row ที่ซ่อม ไม่พิมพ์ LINE user ID หรือข้อมูลลูกค้า
+- ไม่มี secret/config ใหม่ และไม่เปลี่ยนข้อความ/เกณฑ์ Business ของ flow
+
 ## 2026-08-19 — วิเคราะห์ LINE ยังตอบราคาเก่า + เพิ่ม deployment traceability
 
 ### Root cause และหลักฐาน

@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_states", indexes = {
-        @Index(name = "idx_user_state_line_user_id", columnList = "lineUserId"),
         @Index(name = "idx_user_state_follow_up", columnList = "follow_up_reminder_started_at, follow_up_reminder_sent")
 })
 @Data // สร้าง Getter/Setter ให้อัตโนมัติด้วย Lombok

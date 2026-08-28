@@ -4,6 +4,8 @@ import com.example.linechatbotddmobile.config.AdminGroup;
 import com.example.linechatbotddmobile.entity.UserState;
 import com.example.linechatbotddmobile.repository.UserStateRepository;
 import com.example.linechatbotddmobile.service.line.ChatFlowManager; // ปรับให้ตรง
+import com.example.linechatbotddmobile.service.line.UserConversationLockService;
+import com.example.linechatbotddmobile.service.line.UserStateService;
 import com.linecorp.bot.messaging.client.MessagingApiClient;
 import com.linecorp.bot.messaging.model.PushMessageRequest;
 import com.linecorp.bot.messaging.model.ReplyMessageRequest;
@@ -37,6 +39,8 @@ public class LineWebhookController {
     private final com.example.linechatbotddmobile.service.line.LineMessageService lineMessageService;
     private final com.example.linechatbotddmobile.service.line.LineProfileService lineProfileService;
     private final com.example.linechatbotddmobile.service.line.WebhookIdempotencyService webhookIdempotencyService;
+    private final UserStateService userStateService;
+    private final UserConversationLockService conversationLockService;
 
     // ตัวแปรสำหรับหน่วงเวลาการรับรูปภาพ
     private final ConcurrentHashMap<String, Instant> lastImageReceivedTime = new ConcurrentHashMap<>();
@@ -235,6 +239,11 @@ public class LineWebhookController {
     // ⚙️ ประมวลผลข้อความลูกค้า — รันบน messageProcessingExecutor (ไม่ใช่ thread ของ webhook)
     // ==========================================
     private void handleCustomerTextMessage(String lineUserId, String userMessage, String replyToken) {
+        conversationLockService.runLocked(lineUserId,
+                () -> handleCustomerTextMessageLocked(lineUserId, userMessage, replyToken));
+    }
+
+    private void handleCustomerTextMessageLocked(String lineUserId, String userMessage, String replyToken) {
         String msg = userMessage.toLowerCase();
 
         // 🚨 Panic Mode: ตรวจจับคำว่า แอดมิน / คุยกับคน
@@ -249,12 +258,7 @@ public class LineWebhookController {
 
         if (isPanic) {
             // โหลด/สร้าง State เฉพาะตอน panic เท่านั้น
-            UserState userState = userStateRepository.findByLineUserId(lineUserId)
-                    .orElseGet(() -> {
-                        UserState newUser = new UserState();
-                        newUser.setLineUserId(lineUserId);
-                        return newUser;
-                    });
+            UserState userState = userStateService.loadOrCreate(lineUserId);
             // เก็บบริการ/สเต็ปที่ลูกค้าคุยค้างไว้ก่อน เพราะเดี๋ยว state จะถูกทับเป็น ADMIN_MODE
             String pendingService = userState.getServiceName();
             String pendingStep = userState.getCurrentState();
@@ -339,124 +343,103 @@ public class LineWebhookController {
         try {
             Map<String, String> dataMap = parsePostbackData(postbackData);
             String action = dataMap.get("action");
-            String serviceName = dataMap.get("service");
             String targetUserId = dataMap.get("userId");
 
             if (targetUserId == null || action == null) return;
 
-            // 🌟 1. เพิ่มบรรทัดนี้: ดึงชื่อลูกค้าเตรียมไว้
             String customerName = getCustomerName(targetUserId);
-
-            String adminReplyMessage = "";
-            String messageToCustomer = null;
-
-            UserState state = userStateRepository.findByLineUserId(targetUserId).orElse(new UserState());
-            state.setLineUserId(targetUserId);
-
-            switch (action) {
-                case "approve":
-                case "approve_doc":
-                case "approve_credit":
-                    // 💡 เช็คว่าแอดมินกดอนุมัติในขั้นตอนไหน?
-                    if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
-                        // 1. กรณีอนุมัติ "รูปรอบเครื่อง"
-                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                        adminReplyMessage = "✅ ตรวจสภาพผ่าน! (ลูกค้า: " + customerName + ")\nบอทกำลังขอรูปตั้งค่าต่อครับ";
-
-                        // ให้ Flow ไปที่สเต็ปขอรูปตั้งค่า
-                        state.setCurrentState("STEP_9_APPROVED_PHOTO");
-                        userStateRepository.save(state);
-
-                        // กระตุ้นให้ Flow ส่งข้อความ + รูปตัวอย่าง ให้ลูกค้า
-                        String nextStepMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
-                        if (nextStepMessage != null) {
-                            messageToCustomer = nextStepMessage; // ใช้ข้อความจาก Flow ส่งให้ลูกค้า
-                        }
-                    } else {
-                        // 2. กรณีอนุมัติ "ขั้นสุดท้าย" (ประเมินเครดิตและส่งราคา)
-                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                        adminReplyMessage = "✅ อนุมัติเคสผ่านเรียบร้อย! (ลูกค้า: " + customerName + ")\nระบบส่งราคาให้ลูกค้าแล้วครับ";
-                        messageToCustomer = "🎉 ยินดีด้วยครับ! ข้อมูลของคุณได้รับการอนุมัติเรียบร้อยแล้ว แอดมินจะรีบดำเนินการขั้นตอนต่อไปให้นะครับ";
-
-                        state.setCurrentState("STEP_5_PRICING");
-                        userStateRepository.save(state);
-
-                        // กระตุ้นให้ Flow ส่งราคา
-                        String nextStepMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
-                        if (nextStepMessage != null) {
-                            messageToCustomer += "\n\n" + nextStepMessage;
-                        }
-                    }
-                    break;
-
-                case "reject":
-                case "reject_credit":
-                    if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
-                        // 1. ปฏิเสธเคสเพราะสภาพรูปเครื่องไม่ผ่าน
-                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                        adminReplyMessage = "❌ ปฏิเสธสภาพเครื่องเรียบร้อยครับ (ลูกค้า: " + customerName + ")\n(บอทแจ้งลูกค้าแล้ว)";
-                        messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบรูปภาพ สภาพเครื่องยังไม่ตรงตามเงื่อนไขการรับเครื่องของทางร้านครับ หากมีข้อสงสัยสอบถามแอดมินเพิ่มเติมได้เลยครับ";
-                    } else {
-                        // 2. ปฏิเสธเคสขั้นสุดท้าย
-                        // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                        adminReplyMessage = "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ (ลูกค้า: " + customerName + ")";
-                        messageToCustomer = "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
-                    }
-                    state.setCurrentState("REJECTED");
-                    clearFollowUpReminder(state);
-                    userStateRepository.save(state);
-                    break;
-
-                case "take_case":
-                    // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                    adminReplyMessage = "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้า (" + customerName + ") ต่อในแชท 1-on-1 ได้เลยครับ";
-                    messageToCustomer = "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇";
-                    rememberStepStateForResume(state); // จำสเต็ปเดิมไว้ก่อนปิดบอท
-                    state.setCurrentState("ADMIN_MODE");
-                    clearFollowUpReminder(state);
-                    userStateRepository.save(state);
-                    break;
-
-                case "resume_bot":
-                    // 👇 2. แทรกชื่อลูกค้าตรงนี้
-                    adminReplyMessage = "▶️ เปิดบอทให้ดูแลลูกค้า (" + customerName + ") ต่อแล้วครับ";
-
-                    // 👇 ดึงความจำเดิมกลับมา
-                    String prevState = state.getPreviousState();
-                    if (prevState != null) {
-                        state.setCurrentState(prevState); // กลับไปสเต็ปที่ค้างอยู่
-                        state.setPreviousState(null); // ล้างความจำทิ้ง
-                    } else {
-                        state.setCurrentState("STEP_1_INFO"); // กันเหนียวกรณีไม่มีความจำ
-                    }
-                    // 🩹 ถ้า serviceName หายไป (เคสที่เข้า ADMIN_MODE จาก panic mode / [CALL_ADMIN]
-                    //    ซึ่งไม่เคยตั้ง serviceName) ต้องเติมกลับ ไม่งั้น ChatFlowManager หา handler ไม่เจอ
-                    //    → ลูกค้าจะคุยกับ AI แทนที่จะกลับเข้า flow (อาการ "บอทตอบไม่เข้า flow")
-                    if (state.getServiceName() == null || state.getServiceName().isBlank()) {
-                        state.setServiceName(BALLOON_SERVICE);
-                    }
-                    userStateRepository.save(state);
-
-                    // 👇 แจ้งให้ลูกค้าทราบว่าบอทกลับมาแล้ว และให้ลูกค้าพิมพ์ข้อมูลให้บอทเก็บลง Database
-                    messageToCustomer = "น้องทันใจกลับมาดูแลต่อแล้วครับ ✨ รบกวนลูกค้าพิมพ์คำตอบของขั้นตอนเมื่อสักครู่นี้ ให้น้องทันใจบันทึกลงระบบอีกครั้งนะครับ 👇";
-                    break;
-            }
+            PostbackResult result = conversationLockService.callLocked(targetUserId,
+                    () -> processPostbackAction(action, targetUserId, customerName));
 
             // ตอบแอดมินในกลุ่ม
             messagingApiClient.replyMessage(new ReplyMessageRequest(
-                    event.replyToken(), List.of(new TextMessage(adminReplyMessage)), false
+                    event.replyToken(), List.of(new TextMessage(result.adminReplyMessage())), false
             ));
 
             // เด้งแจ้งลูกค้า
-            if (messageToCustomer != null) {
+            if (result.messageToCustomer() != null) {
                 messagingApiClient.pushMessage(null, new PushMessageRequest(
-                        targetUserId, List.of(new TextMessage(messageToCustomer)), false, (List<String>) null
+                        targetUserId, List.of(new TextMessage(result.messageToCustomer())), false, (List<String>) null
                 ));
             }
 
         } catch (Exception e) {
             log.error("❌ Error processing postback: ", e);
         }
+    }
+
+    PostbackResult processPostbackAction(String action, String targetUserId, String customerName) {
+        UserState state = userStateService.loadOrCreate(targetUserId);
+        return switch (action) {
+            case "approve", "approve_doc", "approve_credit" ->
+                    approveCase(state, targetUserId, customerName);
+            case "reject", "reject_credit" -> rejectCase(state, customerName);
+            case "take_case" -> takeCase(state, customerName);
+            case "resume_bot" -> resumeBot(state, customerName);
+            default -> new PostbackResult("", null);
+        };
+    }
+
+    private PostbackResult approveCase(UserState state, String targetUserId, String customerName) {
+        if ("ADMIN_PHOTO_CHECK".equals(state.getCurrentState())) {
+            state.setCurrentState("STEP_9_APPROVED_PHOTO");
+            userStateRepository.save(state);
+            String customerMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
+            return new PostbackResult(
+                    "✅ ตรวจสภาพผ่าน! (ลูกค้า: " + customerName + ")\nบอทกำลังขอรูปตั้งค่าต่อครับ",
+                    customerMessage);
+        }
+
+        state.setCurrentState("STEP_5_PRICING");
+        userStateRepository.save(state);
+        String pricingMessage = chatFlowManager.handleTextMessage(targetUserId, "continue");
+        String customerMessage = "🎉 ยินดีด้วยครับ! ข้อมูลของคุณได้รับการอนุมัติเรียบร้อยแล้ว แอดมินจะรีบดำเนินการขั้นตอนต่อไปให้นะครับ";
+        if (pricingMessage != null) {
+            customerMessage += "\n\n" + pricingMessage;
+        }
+        return new PostbackResult(
+                "✅ อนุมัติเคสผ่านเรียบร้อย! (ลูกค้า: " + customerName + ")\nระบบส่งราคาให้ลูกค้าแล้วครับ",
+                customerMessage);
+    }
+
+    private PostbackResult rejectCase(UserState state, String customerName) {
+        boolean isPhotoCheck = "ADMIN_PHOTO_CHECK".equals(state.getCurrentState());
+        String adminMessage = isPhotoCheck
+                ? "❌ ปฏิเสธสภาพเครื่องเรียบร้อยครับ (ลูกค้า: " + customerName + ")\n(บอทแจ้งลูกค้าแล้ว)"
+                : "❌ เคสนี้ถูกปฏิเสธเรียบร้อยครับ (ลูกค้า: " + customerName + ")";
+        String customerMessage = isPhotoCheck
+                ? "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบรูปภาพ สภาพเครื่องยังไม่ตรงตามเงื่อนไขการรับเครื่องของทางร้านครับ หากมีข้อสงสัยสอบถามแอดมินเพิ่มเติมได้เลยครับ"
+                : "ต้องขออภัยด้วยนะครับ 🙏 จากการตรวจสอบข้อมูล ยังไม่ผ่านเกณฑ์การพิจารณาครับ หากมีข้อสงสัยสอบถามแอดมินได้เลยครับ";
+        state.setCurrentState("REJECTED");
+        clearFollowUpReminder(state);
+        userStateRepository.save(state);
+        return new PostbackResult(adminMessage, customerMessage);
+    }
+
+    private PostbackResult takeCase(UserState state, String customerName) {
+        rememberStepStateForResume(state);
+        state.setCurrentState("ADMIN_MODE");
+        clearFollowUpReminder(state);
+        userStateRepository.save(state);
+        return new PostbackResult(
+                "💬 รับเรื่องแล้ว! (ปิดบอทชั่วคราว) คุยกับลูกค้า (" + customerName + ") ต่อในแชท 1-on-1 ได้เลยครับ",
+                "แอดมินมารับเรื่องแล้วครับ! พิมพ์สอบถามได้เลยครับ 👇");
+    }
+
+    private PostbackResult resumeBot(UserState state, String customerName) {
+        String previousState = state.getPreviousState();
+        state.setCurrentState(previousState != null ? previousState : "STEP_1_INFO");
+        state.setPreviousState(null);
+        if (state.getServiceName() == null || state.getServiceName().isBlank()) {
+            state.setServiceName(BALLOON_SERVICE);
+        }
+        userStateRepository.save(state);
+        return new PostbackResult(
+                "▶️ เปิดบอทให้ดูแลลูกค้า (" + customerName + ") ต่อแล้วครับ",
+                "น้องทันใจกลับมาดูแลต่อแล้วครับ ✨ รบกวนลูกค้าพิมพ์คำตอบของขั้นตอนเมื่อสักครู่นี้ ให้น้องทันใจบันทึกลงระบบอีกครั้งนะครับ 👇");
+    }
+
+    record PostbackResult(String adminReplyMessage, String messageToCustomer) {
     }
 
     private Map<String, String> parsePostbackData(String data) {

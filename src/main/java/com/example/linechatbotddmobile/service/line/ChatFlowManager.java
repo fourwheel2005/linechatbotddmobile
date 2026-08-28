@@ -50,6 +50,8 @@ public class ChatFlowManager {
     private final ChatHistoryRepository chatHistoryRepository;
     private final LineMessageService lineMessageService;
     private final LineProfileService lineProfileService;
+    private final UserStateService userStateService;
+    private final UserConversationLockService conversationLockService;
 
 
     /**
@@ -60,13 +62,14 @@ public class ChatFlowManager {
      * จึงยืม-คืน connection เฉพาะตอนแตะ DB จริงเท่านั้น
      */
     public String handleTextMessage(String lineUserId, String userMessage) {
+        return conversationLockService.callLocked(lineUserId,
+                () -> handleTextMessageLocked(lineUserId, userMessage));
+    }
+
+    private String handleTextMessageLocked(String lineUserId, String userMessage) {
         if (userMessage == null || userMessage.trim().isEmpty()) return null;
 
-        UserState userState = userStateRepository.findByLineUserId(lineUserId).orElseGet(() -> {
-            UserState newUser = new UserState();
-            newUser.setLineUserId(lineUserId);
-            return newUser;
-        });
+        UserState userState = userStateService.loadOrCreate(lineUserId);
 
         String trimmedMessage = userMessage.trim();
         String msgLower = trimmedMessage.toLowerCase();

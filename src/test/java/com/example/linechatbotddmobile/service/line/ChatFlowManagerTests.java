@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +37,8 @@ class ChatFlowManagerTests {
     private AiChatService aiChatService;
     private LineMessageService lineMessageService;
     private LineProfileService lineProfileService;
+    private UserStateService userStateService;
+    private UserConversationLockService conversationLockService;
     private ServiceFlowHandler balloonHandler;
     private ChatFlowManager manager;
 
@@ -48,6 +49,8 @@ class ChatFlowManagerTests {
         aiChatService = Mockito.mock(AiChatService.class);
         lineMessageService = Mockito.mock(LineMessageService.class);
         lineProfileService = Mockito.mock(LineProfileService.class);
+        userStateService = Mockito.mock(UserStateService.class);
+        conversationLockService = new UserConversationLockService();
         balloonHandler = Mockito.mock(ServiceFlowHandler.class);
 
         when(lineProfileService.getDisplayName(anyString())).thenReturn("ลูกค้าทดสอบ");
@@ -62,7 +65,9 @@ class ChatFlowManagerTests {
                 aiChatService,
                 chatHistoryRepository,
                 lineMessageService,
-                lineProfileService
+                lineProfileService,
+                userStateService,
+                conversationLockService
         );
     }
 
@@ -71,7 +76,7 @@ class ChatFlowManagerTests {
         userState.setLineUserId(USER_ID);
         userState.setCurrentState(currentState);
         userState.setServiceName(serviceName);
-        when(userStateRepository.findByLineUserId(USER_ID)).thenReturn(Optional.of(userState));
+        when(userStateService.loadOrCreate(USER_ID)).thenReturn(userState);
         return userState;
     }
 
@@ -130,7 +135,9 @@ class ChatFlowManagerTests {
 
     @Test
     void brandNewCustomerShowingInterestEntersBalloonFlow() {
-        when(userStateRepository.findByLineUserId(USER_ID)).thenReturn(Optional.empty());
+        UserState newState = new UserState();
+        newState.setLineUserId(USER_ID);
+        when(userStateService.loadOrCreate(USER_ID)).thenReturn(newState);
 
         String reply = manager.handleTextMessage(USER_ID, "สนใจผ่อนไอโฟนครับ");
 

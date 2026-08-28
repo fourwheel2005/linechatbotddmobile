@@ -29,6 +29,7 @@ public class CustomerFollowUpReminderScheduler {
 
     private final UserStateRepository userStateRepository;
     private final LineMessageService lineMessageService;
+    private final UserConversationLockService conversationLockService;
 
     // ไม่ใส่ @Transactional — ภายใน loop มีการเรียก LINE push API (blocking I/O)
     // ถ้าครอบด้วย transaction เดียว connection จะถูกถือค้างตลอดทั้ง loop
@@ -43,19 +44,32 @@ public class CustomerFollowUpReminderScheduler {
             if (userState.getLineUserId() == null || userState.getLineUserId().isBlank()) {
                 continue;
             }
-
-            boolean sent = lineMessageService.trySendTextMessage(userState.getLineUserId(), REMINDER_MESSAGE);
-            if (!sent) {
-                continue;
-            }
-
-            userState.setFollowUpReminderSent(true);
-            userStateRepository.save(userState);
-
-            log.info("ส่งข้อความ follow-up หลังลูกค้าเงียบเกิน {} นาที: userId={}, state={}",
-                    IDLE_THRESHOLD_MINUTES,
-                    userState.getLineUserId(),
-                    userState.getCurrentState());
+            String userId = userState.getLineUserId();
+            conversationLockService.runLocked(userId,
+                    () -> sendReminderIfStillDue(userId, cutoff));
         }
+    }
+
+    private void sendReminderIfStillDue(String userId, LocalDateTime cutoff) {
+        UserState current = userStateRepository.findByLineUserId(userId).orElse(null);
+        if (!isStillDue(current, cutoff)) {
+            return;
+        }
+        if (!lineMessageService.trySendTextMessage(userId, REMINDER_MESSAGE)) {
+            return;
+        }
+
+        current.setFollowUpReminderSent(true);
+        userStateRepository.save(current);
+        log.info("ส่งข้อความ follow-up หลังลูกค้าเงียบเกิน {} นาที: userId={}, state={}",
+                IDLE_THRESHOLD_MINUTES, userId, current.getCurrentState());
+    }
+
+    private boolean isStillDue(UserState state, LocalDateTime cutoff) {
+        return state != null
+                && FOLLOW_UP_STATES.contains(state.getCurrentState())
+                && state.getFollowUpReminderStartedAt() != null
+                && !state.getFollowUpReminderStartedAt().isAfter(cutoff)
+                && !Boolean.TRUE.equals(state.getFollowUpReminderSent());
     }
 }
