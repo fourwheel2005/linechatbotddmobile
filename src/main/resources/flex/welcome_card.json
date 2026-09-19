@@ -4,8 +4,9 @@
     "type": "image",
     "url": "https://cdn.jsdelivr.net/gh/fourwheel2005/image@main/thunjailogo.png",
     "size": "full",
-    "aspectRatio": "20:13",
-    "aspectMode": "cover"
+    "aspectRatio": "3:1",
+    "aspectMode": "fit",
+    "backgroundColor": "#F0FDF4"
   },
   "body": {
     "type": "box",
@@ -15,45 +16,53 @@
         "type": "text",
         "text": "สวัสดีครับคุณลูกค้า 🙏✨",
         "weight": "bold",
-        "size": "xl"
+        "size": "lg",
+        "color": "#1F2937",
+        "wrap": true
       },
       {
         "type": "text",
         "text": "ยินดีต้อนรับสู่ ร้านทันใจ ผ่อนง่ายใช้แค่บัตรประชาชนใบเดียว ไม่เช็คบูโรครับ เลือกทำรายการด้านล่างได้เลยครับ 👇",
         "wrap": true,
-        "color": "#666666",
+        "color": "#4B5563",
         "size": "sm",
-        "margin": "md"
+        "margin": "sm"
       }
-    ]
+    ],
+    "paddingAll": "16px",
+    "backgroundColor": "#FFFFFF"
   },
   "footer": {
     "type": "box",
-    "layout": "horizontal",
+    "layout": "vertical",
     "spacing": "sm",
     "contents": [
       {
         "type": "button",
         "style": "primary",
-        "height": "sm",
+        "height": "md",
         "action": {
           "type": "message",
           "label": "📱 ผ่อนบอลลูน",
           "text": "สนใจผ่อนบอลลูน"
         },
-        "color": "#00B900"
+        "color": "#047857"
       },
       {
         "type": "button",
         "style": "primary",
-        "height": "sm",
+        "height": "md",
         "action": {
           "type": "message",
           "label": "🔒 จำนำ iCloud",
           "text": "สนใจจำนำ iCloud"
         },
-        "color": "#1E88E5"
+        "color": "#1D4ED8"
       }
-    ]
-  }
+    ],
+    "paddingAll": "16px",
+    "paddingTop": "4px",
+    "backgroundColor": "#FFFFFF"
+  },
+  "size": "mega"
 }

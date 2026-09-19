@@ -9,12 +9,15 @@
         "type": "text",
         "text": "🔴 คิวใหม่: รอตรวจสภาพเครื่อง",
         "weight": "bold",
-        "color": "#FFFFFF",
-        "size": "md"
+        "color": "#9A3412",
+        "size": "md",
+        "wrap": true
       }
     ],
-    "backgroundColor": "#FF4B4B",
-    "paddingAll": "12px"
+    "backgroundColor": "#FFF7ED",
+    "paddingAll": "12px",
+    "paddingStart": "16px",
+    "paddingEnd": "16px"
   },
   "body": {
     "type": "box",
@@ -24,14 +27,15 @@
         "type": "text",
         "text": "บริการ: {{SERVICE_NAME}}",
         "weight": "bold",
-        "size": "xl",
-        "margin": "md"
+        "size": "md",
+        "color": "#1F2937",
+        "wrap": true
       },
       {
         "type": "box",
         "layout": "vertical",
-        "margin": "lg",
-        "spacing": "sm",
+        "margin": "md",
+        "spacing": "md",
         "contents": [
           {
             "type": "box",
@@ -41,70 +45,44 @@
               {
                 "type": "text",
                 "text": "ลูกค้า",
-                "color": "#aaaaaa",
+                "color": "#6B7280",
                 "size": "sm",
-                "flex": 1
+                "flex": 1,
+                "wrap": true
               },
               {
                 "type": "text",
                 "text": "{{CUSTOMER_NAME}}",
                 "wrap": true,
-                "color": "#666666",
+                "color": "#1F2937",
                 "size": "sm",
                 "flex": 3,
-                "weight": "bold"
+                "weight": "regular"
               }
             ]
           },
           {
             "type": "box",
-            "layout": "baseline",
-            "spacing": "sm",
+            "layout": "vertical",
             "contents": [
-              {
-                "type": "text",
-                "text": "รหัส",
-                "color": "#aaaaaa",
-                "size": "sm",
-                "flex": 1
-              },
-              {
-                "type": "text",
-                "text": "{{USER_ID}}",
-                "wrap": true,
-                "color": "#666666",
-                "size": "sm",
-                "flex": 3,
-                "weight": "bold"
-              }
-            ]
-          },
-          {
-            "type": "box",
-            "layout": "baseline",
-            "spacing": "sm",
-            "contents": [
-              {
-                "type": "text",
-                "text": "รุ่น",
-                "color": "#aaaaaa",
-                "size": "sm",
-                "flex": 1
-              },
               {
                 "type": "text",
                 "text": "{{DEVICE_MODEL}}",
                 "wrap": true,
-                "color": "#666666",
+                "color": "#1F2937",
                 "size": "sm",
-                "flex": 3,
-                "weight": "bold"
+                "weight": "regular"
               }
-            ]
+            ],
+            "backgroundColor": "#F8FAFC",
+            "paddingAll": "12px",
+            "cornerRadius": "8px"
           }
         ]
       }
-    ]
+    ],
+    "paddingAll": "16px",
+    "backgroundColor": "#FFFFFF"
   },
   "footer": {
     "type": "box",
@@ -114,27 +92,30 @@
       {
         "type": "button",
         "style": "primary",
-        "height": "sm",
+        "height": "md",
         "action": {
           "type": "postback",
           "label": "✅ สภาพผ่าน",
           "data": "action=approve&service={{SERVICE_EN}}&userId={{USER_ID}}",
           "displayText": "แอดมินกด: สภาพผ่าน (ลูกค้า: {{CUSTOMER_NAME}})"
         },
-        "color": "#00B900"
+        "color": "#047857"
       },
       {
         "type": "button",
         "style": "secondary",
-        "height": "sm",
+        "height": "md",
         "action": {
           "type": "postback",
           "label": "❌ ไม่ผ่าน",
           "data": "action=reject&service={{SERVICE_EN}}&userId={{USER_ID}}",
           "displayText": "แอดมินกด: ไม่ผ่าน (ลูกค้า: {{CUSTOMER_NAME}})"
         },
-        "color": "#F0F0F0"
+        "color": "#F1F5F9"
       }
-    ]
+    ],
+    "paddingAll": "16px",
+    "paddingTop": "4px",
+    "backgroundColor": "#FFFFFF"
   }
 }

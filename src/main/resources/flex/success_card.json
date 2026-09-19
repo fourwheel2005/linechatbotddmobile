@@ -9,12 +9,15 @@
         "type": "text",
         "text": "🎉 ลูกค้ายืนยันจำนวนงวดแล้ว!",
         "weight": "bold",
-        "color": "#FFFFFF",
-        "size": "md"
+        "color": "#047857",
+        "size": "md",
+        "wrap": true
       }
     ],
-    "backgroundColor": "#00B900",
-    "paddingAll": "12px"
+    "backgroundColor": "#ECFDF5",
+    "paddingAll": "12px",
+    "paddingStart": "16px",
+    "paddingEnd": "16px"
   },
   "body": {
     "type": "box",
@@ -24,14 +27,15 @@
         "type": "text",
         "text": "บริการ: {{SERVICE_NAME}}",
         "weight": "bold",
-        "size": "xl",
-        "margin": "md"
+        "size": "md",
+        "color": "#1F2937",
+        "wrap": true
       },
       {
         "type": "box",
         "layout": "vertical",
-        "margin": "lg",
-        "spacing": "sm",
+        "margin": "md",
+        "spacing": "md",
         "contents": [
           {
             "type": "box",
@@ -41,47 +45,49 @@
               {
                 "type": "text",
                 "text": "ลูกค้า",
-                "color": "#aaaaaa",
+                "color": "#6B7280",
                 "size": "sm",
-                "flex": 1
+                "flex": 1,
+                "wrap": true
               },
               {
                 "type": "text",
                 "text": "{{CUSTOMER_NAME}}",
                 "wrap": true,
-                "color": "#666666",
+                "color": "#1F2937",
                 "size": "sm",
                 "flex": 3,
-                "weight": "bold"
+                "weight": "regular"
               }
             ]
           },
           {
             "type": "box",
-            "layout": "baseline",
-            "spacing": "sm",
+            "layout": "vertical",
+            "spacing": "xs",
             "contents": [
               {
                 "type": "text",
                 "text": "รายละเอียด",
-                "color": "#aaaaaa",
+                "color": "#6B7280",
                 "size": "sm",
-                "flex": 1
+                "wrap": true
               },
               {
                 "type": "text",
                 "text": "{{EXTRA_INFO}}",
                 "wrap": true,
-                "color": "#00B900",
+                "color": "#1F2937",
                 "size": "sm",
-                "flex": 3,
-                "weight": "bold"
+                "weight": "regular"
               }
             ]
           }
         ]
       }
-    ]
+    ],
+    "paddingAll": "16px",
+    "backgroundColor": "#FFFFFF"
   },
   "footer": {
     "type": "box",
@@ -91,15 +97,18 @@
       {
         "type": "button",
         "style": "primary",
-        "height": "sm",
+        "height": "md",
         "action": {
           "type": "postback",
           "label": "💬 เข้าสรุปยอด & ขอเอกสาร",
           "data": "action=take_case&service={{SERVICE_EN}}&userId={{USER_ID}}",
           "displayText": "แอดมินเข้าดูแลเคสนี้ (สรุปยอดโอน) (ลูกค้า: {{CUSTOMER_NAME}})"
         },
-        "color": "#17A2B8"
+        "color": "#047857"
       }
-    ]
+    ],
+    "paddingAll": "16px",
+    "paddingTop": "4px",
+    "backgroundColor": "#FFFFFF"
   }
 }
