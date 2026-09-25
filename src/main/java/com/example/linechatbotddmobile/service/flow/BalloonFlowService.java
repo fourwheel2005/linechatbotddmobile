@@ -532,7 +532,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // 💰 ตารางราคาผ่อนบอลลูน — เรียงแถวตามตารางราคาของร้าน (13 mini → 17 Pro Max)
+    // 💰 ตารางราคาผ่อนบอลลูน — เรียงแถวตามตารางราคาของร้าน (13 mini → 18 Duo, 26 รุ่น)
     //
     //    ลำดับตัวเลขหลัง "รับซื้อ" = งวด 6, 8, 10, 12, 15, 18, 21, 24 (INSTALLMENT_MONTHS)
     //    ใส่เท่าที่รุ่นนั้นมีในตาราง แล้วหยุด — รุ่นที่ตารางเว้นว่างไว้จะไม่ถูกเสนอให้ลูกค้าเลือก
@@ -567,6 +567,10 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "17 air"       -> price(12000, 3850, 3050, 2550, 2350, 1950, 1650);
             case "17 pro"       -> price(15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690);
             case "17 pro max"   -> price(21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350);
+            case "18"           -> price(18000, 5750, 4550, 3750, 3350, 2750, 2450, 2150, 1950);
+            case "18 pro"       -> price(25000, 7950, 6250, 5250, 4550, 3850, 3350, 2950, 2750);
+            case "18 pro max"   -> price(28000, 8850, 6950, 5850, 5150, 4250, 3750, 3350, 2950);
+            case "18 duo"       -> price(35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750);
             default -> null;
         };
     }
@@ -597,7 +601,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
      */
     private String guessModelFromRawMessage(String msg) {
         String m = msg.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
-        if (!m.matches("^1[1-7].*")) return null;
+        if (!m.matches("^1[1-8].*")) return null;
 
         String base = m.substring(0, 2);
         // เรียงจากคำเฉพาะเจาะจงที่สุดก่อน — "plus" ต้องมาก่อน "p" ไม่งั้นกลายเป็น Pro
@@ -606,7 +610,8 @@ public class BalloonFlowService implements ServiceFlowHandler {
         if (m.contains("plus")) return base + " Plus";
         if (m.contains("mini")) return base + " mini";
         if (m.contains("air")) return base + " Air";
-        if (m.contains("pro") || m.matches("^1[1-7]\\s*p\\b.*")) return base + " Pro";
+        if (m.contains("duo")) return base + " Duo";
+        if (m.contains("pro") || m.matches("^1[1-8]\\s*p\\b.*")) return base + " Pro";
         return base;
     }
 
@@ -620,7 +625,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 .replace("ไอโฟน", " ")
                 .replace("promax", "pro max")
                 // เติมช่องว่างให้ "15pro" → "15 pro" (ระวังอย่าแตะ 16e ที่ต้องติดกัน)
-                .replaceAll("(?<=\\d)(pro|plus|mini|air)", " $1")
+                .replaceAll("(?<=\\d)(pro|plus|mini|air|duo)", " $1")
                 .replaceAll("\\s+", " ")
                 .trim();
     }

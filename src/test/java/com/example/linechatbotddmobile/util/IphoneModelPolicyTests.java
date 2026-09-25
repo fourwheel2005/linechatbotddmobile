@@ -42,6 +42,14 @@ class IphoneModelPolicyTests {
     }
 
     @Test
+    void rejectionMessageAdvertisesTheCurrentAcceptedRange() {
+        // ช่วงรุ่นในข้อความต้องตรงกับรุ่นสูงสุดในตารางราคา (18 Duo)
+        assertThat(IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_13_MESSAGE)
+                .contains("เปิดรับ 13-18 Duo")
+                .doesNotContain("17promax");
+    }
+
+    @Test
     void acceptsEveryModelThatExistsInThePriceTable() {
         // 13 mini คือรุ่นเล็กสุดที่รับ — ระวังอย่าให้ "13" ไปติดกฎของ "1" หรือ "12"
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("13 mini")).isFalse();
@@ -52,5 +60,9 @@ class IphoneModelPolicyTests {
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("17e")).isFalse();
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("17 Air")).isFalse();
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("17 Pro Max")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18 Pro Max")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18 Duo")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Message("ไอโฟน 18 duo")).isFalse();
     }
 }

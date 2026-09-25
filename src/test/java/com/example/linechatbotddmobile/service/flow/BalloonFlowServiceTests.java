@@ -125,6 +125,12 @@ class BalloonFlowServiceTests {
         assertThat(modelFor("16E")).isEqualTo("16e");
         assertThat(modelFor("15 PRO")).isEqualTo("15 Pro");
         assertThat(modelFor("16")).isEqualTo("16");
+        // iPhone 18 — ต้องรู้จักทั้งเลข 18 และรุ่นย่อยใหม่ "Duo"
+        assertThat(modelFor("18")).isEqualTo("18");
+        assertThat(modelFor("18 Pro")).isEqualTo("18 Pro");
+        assertThat(modelFor("18 pm")).isEqualTo("18 Pro Max");
+        assertThat(modelFor("18 Duo")).isEqualTo("18 Duo");
+        assertThat(modelFor("18duo")).isEqualTo("18 Duo");
     }
 
     private String modelFor(String customerMessage) {

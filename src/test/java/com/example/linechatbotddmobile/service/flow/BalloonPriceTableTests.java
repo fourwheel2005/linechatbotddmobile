@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 /**
  * ล็อกตารางราคาผ่อนบอลลูนให้ตรงกับตารางของร้านแบบตัวต่อตัว
  *
- * ตัวเลขในคลาสนี้คัดมาจาก iphone_balloon_installments.csv ที่ร้านส่งมา (13 mini → 17 Pro Max, 22 รุ่น)
+ * ตัวเลขในคลาสนี้คัดมาจาก iphone_balloon_installments.csv ที่ร้านส่งมา (13 mini → 18 Duo, 26 รุ่น)
  * ถ้าใครแก้ราคาในโค้ดผิดตัวเดียว เทสต์นี้จะจับได้ทันทีว่ารุ่นไหน งวดไหน
  *
  * รูปแบบ: { รับซื้อ, 6, 8, 10, 12, 15, 18, 21, 24 } — ใส่เท่าที่รุ่นนั้นมีในตาราง
@@ -60,6 +60,10 @@ class BalloonPriceTableTests {
         SHOP_PRICE_TABLE.put("17 Air",     new int[]{12000, 3850, 3050, 2550, 2350, 1950, 1650});
         SHOP_PRICE_TABLE.put("17 Pro",     new int[]{15000, 4790, 3790, 3290, 2890, 2390, 2090, 1890, 1690});
         SHOP_PRICE_TABLE.put("17 Pro Max", new int[]{21000, 6950, 5550, 4650, 4050, 3350, 2950, 2550, 2350});
+        SHOP_PRICE_TABLE.put("18",         new int[]{18000, 5750, 4550, 3750, 3350, 2750, 2450, 2150, 1950});
+        SHOP_PRICE_TABLE.put("18 Pro",     new int[]{25000, 7950, 6250, 5250, 4550, 3850, 3350, 2950, 2750});
+        SHOP_PRICE_TABLE.put("18 Pro Max", new int[]{28000, 8850, 6950, 5850, 5150, 4250, 3750, 3350, 2950});
+        SHOP_PRICE_TABLE.put("18 Duo",     new int[]{35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750});
     }
 
     private UserStateRepository userStateRepository;
@@ -157,6 +161,10 @@ class BalloonPriceTableTests {
         assertThat(quoteFor("iphone15promax")).contains("ยอดรับซื้อ: 13,000 บ."); // พิมพ์ติดกันหมด
         assertThat(quoteFor("16e")).contains("ยอดรับซื้อ: 7,000 บ.");            // 16e ต้องไม่ถูกแยกเป็น "16 e"
         assertThat(quoteFor("17E")).contains("ยอดรับซื้อ: 7,000 บ.");            // รุ่นใหม่ในตาราง
+        assertThat(quoteFor("iPhone 18 Pro Max")).contains("ยอดรับซื้อ: 28,000 บ.");
+        assertThat(quoteFor("18duo")).contains("ยอดรับซื้อ: 35,000 บ.");         // พิมพ์ติดกัน ต้องเจอ 18 Duo
+        assertThat(quoteFor("18 DUO")).contains("ยอดรับซื้อ: 35,000 บ.");
+        assertThat(quoteFor("18")).contains("ยอดรับซื้อ: 18,000 บ.");
     }
 
     @Test

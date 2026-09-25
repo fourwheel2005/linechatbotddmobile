@@ -12,11 +12,11 @@ import java.util.regex.Pattern;
 public final class IphoneModelPolicy {
 
     public static final String UNSUPPORTED_BELOW_IPHONE_13_MESSAGE =
-            "ขออภัยครับลูกค้า ทางร้านเปิดรับ 13-17promax ครับ หากลูกค้ามีไอโฟน 13 ขึ้นติดต่อมาอีกครั้งนะครับผม";
+            "ขออภัยครับลูกค้า ทางร้านเปิดรับ 13-18 Duo ครับ หากลูกค้ามีไอโฟน 13 ขึ้นติดต่อมาอีกครั้งนะครับผม";
 
     /**
      * รุ่นที่ไม่รับ: SE ทุกรุ่น, X / XR / XS / XS Max, 10, 11 และ 12 (รวมรุ่นย่อย mini / Pro / Pro Max)
-     * ตัว [1-9] ท้ายสุดไว้จับรุ่นเลขหลักเดียว (iPhone 5-9) โดยมี (?!\\d) กัน 13-17 ไม่ให้ติดร่างแห
+     * ตัว [1-9] ท้ายสุดไว้จับรุ่นเลขหลักเดียว (iPhone 5-9) โดยมี (?!\\d) กัน 13-18 ไม่ให้ติดร่างแห
      */
     private static final String UNSUPPORTED_MODEL_ALTERNATIVES =
             "se(?:\\s*(?:1|2|3|2020|2022))?"
