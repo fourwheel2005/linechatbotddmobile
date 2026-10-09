@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class IphoneModelPolicy {
 
     public static final String UNSUPPORTED_BELOW_IPHONE_13_MESSAGE =
-            "ขออภัยครับลูกค้า ทางร้านเปิดรับ 13-18 Duo ครับ หากลูกค้ามีไอโฟน 13 ขึ้นติดต่อมาอีกครั้งนะครับผม";
+            "ขออภัยครับลูกค้า ทางร้านเปิดรับ 13 - 18 Pro Max และ iPhone Duo ครับ หากลูกค้ามีไอโฟน 13 ขึ้นติดต่อมาอีกครั้งนะครับผม";
 
     /**
      * รุ่นที่ไม่รับ: SE ทุกรุ่น, X / XR / XS / XS Max, 10, 11 และ 12 (รวมรุ่นย่อย mini / Pro / Pro Max)

@@ -125,12 +125,97 @@ class BalloonFlowServiceTests {
         assertThat(modelFor("16E")).isEqualTo("16e");
         assertThat(modelFor("15 PRO")).isEqualTo("15 Pro");
         assertThat(modelFor("16")).isEqualTo("16");
-        // iPhone 18 — ต้องรู้จักทั้งเลข 18 และรุ่นย่อยใหม่ "Duo"
+        // iPhone 18
         assertThat(modelFor("18")).isEqualTo("18");
         assertThat(modelFor("18 Pro")).isEqualTo("18 Pro");
         assertThat(modelFor("18 pm")).isEqualTo("18 Pro Max");
-        assertThat(modelFor("18 Duo")).isEqualTo("18 Duo");
-        assertThat(modelFor("18duo")).isEqualTo("18 Duo");
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // iPhone Duo — ชื่อรุ่นจริงไม่มีตัวเลข ต้องเก็บเป็น "Duo" ชื่อเดียวเสมอ
+    // ══════════════════════════════════════════════════════════
+
+    @Test
+    void iphoneDuoIsRecognisedWithoutAModelNumberWhenAiFails() {
+        aiReturnsModel("unknown");
+
+        assertThat(modelFor("Duo")).isEqualTo("Duo");
+        assertThat(modelFor("iPhone Duo")).isEqualTo("Duo");
+        assertThat(modelFor("iphoneduo")).isEqualTo("Duo");
+        assertThat(modelFor("ไอโฟนดูโอ")).isEqualTo("Duo");
+        assertThat(modelFor("ดูโอ ครับ")).isEqualTo("Duo");
+        assertThat(modelFor("18 Duo")).isEqualTo("Duo");   // ชื่อเก่าที่ลูกค้าอาจพิมพ์ ต้องรวมเป็นชื่อเดียว
+    }
+
+    @Test
+    void iphoneDuoIsCanonicalisedWhateverTheAiReturns() {
+        aiReturnsModel("18 Duo");                           // AI เลียนตัวอย่างเก่า
+        assertThat(modelFor("iPhone Duo")).isEqualTo("Duo");
+
+        aiReturnsModel("ดูโอ");                             // AI ส่งคำไทยกลับมา
+        assertThat(modelFor("ไอโฟนดูโอ")).isEqualTo("Duo");
+
+        aiReturnsModel("18");                               // AI ตัดคำว่า Duo ทิ้ง → ห้ามเสนอราคา iPhone 18
+        assertThat(modelFor("iPhone 18 Duo")).isEqualTo("Duo");
+    }
+
+    @Test
+    void iphoneDuoConfirmationKeepsTheExistingSentence() {
+        aiReturnsModel("Duo");
+        UserState user = newUser("U-duo", "STEP_2_CAPACITY");
+
+        String reply = service.processMessage(user, "iPhone Duo");
+
+        assertThat(reply).isEqualTo("รับทราบครับ รุ่น **iPhone Duo** นะครับ! 📱\n"
+                + "👉 ความจุ **กี่ GB** ครับผม? (เช่น 128, 256, 512)");
+        assertThat(user.getCurrentState()).isEqualTo("STEP_3_PROVINCE");
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ชื่อรุ่นย่อยภาษาไทย + กัน AI ตัดรุ่นย่อยทิ้ง (เสี่ยงเสนอราคาต่ำกว่าจริง)
+    // ══════════════════════════════════════════════════════════
+
+    @Test
+    void thaiSubModelWordsAreUnderstoodWhenAiFails() {
+        aiReturnsModel("unknown");
+
+        assertThat(modelFor("14 พลัส")).isEqualTo("14 Plus");
+        assertThat(modelFor("13 โปรแม็กซ์")).isEqualTo("13 Pro Max");
+        assertThat(modelFor("13 โปรแมก")).isEqualTo("13 Pro Max");
+        assertThat(modelFor("15 โปร")).isEqualTo("15 Pro");
+        assertThat(modelFor("13 มินิ")).isEqualTo("13 mini");
+        assertThat(modelFor("17 แอร์")).isEqualTo("17 Air");
+        assertThat(modelFor("ไอโฟน 14 plus")).isEqualTo("14 Plus");  // มีคำว่าไอโฟนนำหน้า
+    }
+
+    @Test
+    void subModelTypedRightAfterTheNumberWinsOverABareNumberFromAi() {
+        aiReturnsModel("14");
+        assertThat(modelFor("14 พลัส")).isEqualTo("14 Plus");
+
+        aiReturnsModel("15");
+        assertThat(modelFor("15 Pro ครับ")).isEqualTo("15 Pro");
+
+        aiReturnsModel("13");
+        assertThat(modelFor("13pm")).isEqualTo("13 Pro Max");
+    }
+
+    @Test
+    void aiAnswerIsKeptWhenTheMessageHasNoExplicitSubModel() {
+        aiReturnsModel("15");
+        assertThat(modelFor("15 มีโปรโมชั่นไหมครับ")).isEqualTo("15");   // "โปรโมชั่น" ไม่ใช่รุ่น Pro
+        assertThat(modelFor("15 promotion")).isEqualTo("15");
+
+        aiReturnsModel("16");
+        assertThat(modelFor("16 ครับ")).isEqualTo("16");
+
+        aiReturnsModel("15 Pro");                           // AI ตอบรุ่นย่อยมาแล้ว → เชื่อ AI ไม่ทับ
+        assertThat(modelFor("15 pm")).isEqualTo("15 Pro");
+    }
+
+    private void aiReturnsModel(String model) {
+        when(aiDataExtractorService.extractInfo(anyString(), any()))
+                .thenReturn(new ExtractedData(model, 0, "unknown", "unknown"));
     }
 
     private String modelFor(String customerMessage) {

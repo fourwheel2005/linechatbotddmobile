@@ -69,6 +69,23 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+");
 
+    // 📱 iPhone Duo — ชื่อรุ่นจริงไม่มีตัวเลข จึงเก็บเป็น "Duo" ชื่อเดียวเสมอ
+    //    ("18 Duo" ที่เคยใช้เป็นชื่อชั่วคราว ยังถูกรวมมาที่ชื่อนี้ กันลูกค้าที่บันทึกรุ่นไว้ก่อนหน้าหาราคาไม่เจอ)
+    private static final String DUO_MODEL = "Duo";
+    private static final Pattern DUO_WORD = Pattern.compile("duo|ดูโอ");
+
+    // คำนำหน้าที่ลูกค้าชอบพิมพ์ก่อนเลขรุ่น ("iphone 14 plus", "ไอโฟน14") — ตัดออกก่อนอ่านเลขรุ่น
+    private static final Pattern PHONE_PREFIX = Pattern.compile("^(?:iphone|ไอโฟน|ไอ|ip)\\s*");
+
+    // รุ่นย่อยภาษาไทย — "โปร" ต้องไม่ใช่ "โปรโมชั่น"
+    private static final Pattern THAI_PRO_MAX = Pattern.compile("โปร\\s*แม็?[กค]");
+    private static final Pattern THAI_PRO = Pattern.compile("โปร(?!โม)");
+
+    // รุ่นย่อยที่พิมพ์ "ติดหลังเลขรุ่นทันที" เท่านั้นจึงนับว่าลูกค้าระบุมาจริง
+    // ใช้ตัดสินว่าจะทับคำตอบของ AI ที่ส่งมาแค่เลขรุ่นหรือไม่ ("15 promotion" / "15 มีโปรไหม" ไม่นับ)
+    private static final Pattern EXPLICIT_SUB_MODEL = Pattern.compile(
+            "^1[1-8]\\s*(?:e\\b|pro\\s*max|promax|pm\\b|pro(?!mo)|p\\b|plus|mini|air|โปร(?!โม)|พลัส|มินิ|แอร์)");
+
     /**
      * ราคาผ่อนบอลลูนของ 1 รุ่น
      *
@@ -144,11 +161,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
                 }
 
                 ExtractedData modelData = aiDataExtractorService.extractInfo(msg, lastMessage);
-                String extractedModel = modelData.deviceModel();
-
-                if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
-                    extractedModel = guessModelFromRawMessage(msg);
-                }
+                String extractedModel = resolveModel(modelData.deviceModel(), msg);
 
                 if (extractedModel == null || "unknown".equalsIgnoreCase(extractedModel)) {
                     responseMessage = handleRetryLogic(userState, userId, msg, "บอทสกัดรุ่นโทรศัพท์ไม่ได้", "น้องทันใจยังไม่ทราบรุ่นเลยครับ 😅 รบกวนแจ้ง 'รุ่นไอโฟน' เช่น 13 Pro Max หรือ 15 Pro อีกครั้งนะครับ 📱");
@@ -416,7 +429,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
 
                 userState.setCurrentState("STEP_6_MONTH_SELECTION");
                 StringBuilder offer = new StringBuilder()
-                        .append("ข้อเสนอสำหรับ **iPhone ").append(userState.getDeviceModel()).append("** มาแล้วครับ! 🎉\n")
+                        .append("ข้อเสนอสำหรับ **iPhone ").append(displayModelName(userState.getDeviceModel())).append("** มาแล้วครับ! 🎉\n")
                         .append("- ยอดรับซื้อ: ").append(formatBaht(price.buyPrice())).append(" บ.\n");
                 // ไล่เฉพาะงวดที่รุ่นนี้มีจริง — รุ่นเล็กจะได้ไม่โชว์ 15/18/21/24 ที่ร้านไม่ได้เปิดให้
                 price.monthlyPayments().forEach((months, amount) ->
@@ -532,7 +545,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // 💰 ตารางราคาผ่อนบอลลูน — เรียงแถวตามตารางราคาของร้าน (13 mini → 18 Duo, 26 รุ่น)
+    // 💰 ตารางราคาผ่อนบอลลูน — เรียงแถวตามตารางราคาของร้าน (13 mini → iPhone Duo, 26 รุ่น)
     //
     //    ลำดับตัวเลขหลัง "รับซื้อ" = งวด 6, 8, 10, 12, 15, 18, 21, 24 (INSTALLMENT_MONTHS)
     //    ใส่เท่าที่รุ่นนั้นมีในตาราง แล้วหยุด — รุ่นที่ตารางเว้นว่างไว้จะไม่ถูกเสนอให้ลูกค้าเลือก
@@ -570,7 +583,7 @@ public class BalloonFlowService implements ServiceFlowHandler {
             case "18"           -> price(18000, 5750, 4550, 3750, 3350, 2750, 2450, 2150, 1950);
             case "18 pro"       -> price(25000, 7950, 6250, 5250, 4550, 3850, 3350, 2950, 2750);
             case "18 pro max"   -> price(28000, 8850, 6950, 5850, 5150, 4250, 3750, 3350, 2950);
-            case "18 duo"       -> price(35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750);
+            case "duo", "18 duo" -> price(35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750);   // iPhone Duo (+ชื่อชั่วคราวเดิม)
             default -> null;
         };
     }
@@ -600,19 +613,59 @@ public class BalloonFlowService implements ServiceFlowHandler {
      *    (บั๊กนี้เจอตอนยิง response ทดสอบ ไม่ได้เกิดจากการแก้ราคารอบนี้)
      */
     private String guessModelFromRawMessage(String msg) {
-        String m = msg.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+        String m = stripPhonePrefix(msg);
+        if (mentionsDuo(m)) return DUO_MODEL;
         if (!m.matches("^1[1-8].*")) return null;
 
         String base = m.substring(0, 2);
         // เรียงจากคำเฉพาะเจาะจงที่สุดก่อน — "plus" ต้องมาก่อน "p" ไม่งั้นกลายเป็น Pro
         if (m.matches("^1[67]\\s*e\\b.*")) return base + "e";   // 16e / 17e
-        if (m.contains("pro max") || m.contains("promax") || m.contains("pm")) return base + " Pro Max";
-        if (m.contains("plus")) return base + " Plus";
-        if (m.contains("mini")) return base + " mini";
-        if (m.contains("air")) return base + " Air";
-        if (m.contains("duo")) return base + " Duo";
-        if (m.contains("pro") || m.matches("^1[1-8]\\s*p\\b.*")) return base + " Pro";
+        if (m.contains("pro max") || m.contains("promax") || m.contains("pm") || THAI_PRO_MAX.matcher(m).find()) return base + " Pro Max";
+        if (m.contains("plus") || m.contains("พลัส")) return base + " Plus";
+        if (m.contains("mini") || m.contains("มินิ")) return base + " mini";
+        if (m.contains("air") || m.contains("แอร์")) return base + " Air";
+        if (m.contains("pro") || THAI_PRO.matcher(m).find() || m.matches("^1[1-8]\\s*p\\b.*")) return base + " Pro";
         return base;
+    }
+
+    /**
+     * ตัดสินรุ่นสุดท้ายจากคำตอบของ AI + ข้อความที่ลูกค้าพิมพ์จริง
+     *  1) มีคำว่า Duo/ดูโอ (ฝั่งไหนก็ได้) → "Duo" เสมอ — กัน AI เติมเลข 18 หรือตัดคำว่า Duo ทิ้ง
+     *     (ถ้าเหลือแค่ "18" ลูกค้าจะโดนเสนอราคา 18,000 แทน 35,000)
+     *  2) AI สกัดไม่ได้ → เดาจากข้อความดิบ (ตาข่ายรับตอน OpenAI ล่ม — พฤติกรรมเดิม)
+     *  3) AI ตอบมาแค่เลขรุ่น แต่ลูกค้าพิมพ์รุ่นย่อยติดหลังเลขชัดเจน → ใช้รุ่นที่ละเอียดกว่า
+     *     (AI ตอบ "14" ทั้งที่ลูกค้าพิมพ์ "14 พลัส" = เสนอราคาต่ำกว่าจริง)
+     *  นอกนั้นเชื่อ AI เหมือนเดิมทุกกรณี
+     */
+    private String resolveModel(String aiModel, String msg) {
+        boolean aiFailed = aiModel == null || aiModel.isBlank() || "unknown".equalsIgnoreCase(aiModel.trim());
+        if (mentionsDuo(msg.toLowerCase(Locale.ROOT))
+                || (!aiFailed && mentionsDuo(aiModel.toLowerCase(Locale.ROOT)))) {
+            return DUO_MODEL;
+        }
+        if (aiFailed) return guessModelFromRawMessage(msg);
+
+        String aiTrimmed = aiModel.trim();
+        if (aiTrimmed.matches("1[1-8]") && EXPLICIT_SUB_MODEL.matcher(stripPhonePrefix(msg)).find()) {
+            String guessed = guessModelFromRawMessage(msg);
+            if (guessed != null && guessed.startsWith(aiTrimmed) && !guessed.equals(aiTrimmed)) return guessed;
+        }
+        return aiModel;
+    }
+
+    /** ชื่อรุ่นที่แสดงให้ลูกค้าเห็น — รวมชื่อชั่วคราว "18 Duo" ให้เป็น "Duo" ตามชื่อรุ่นจริง */
+    private String displayModelName(String deviceModel) {
+        if (deviceModel != null && mentionsDuo(deviceModel.toLowerCase(Locale.ROOT))) return DUO_MODEL;
+        return deviceModel;
+    }
+
+    private boolean mentionsDuo(String lowerCaseText) {
+        return DUO_WORD.matcher(lowerCaseText).find();
+    }
+
+    private String stripPhonePrefix(String msg) {
+        String m = msg.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+        return PHONE_PREFIX.matcher(m).replaceFirst("");
     }
 
     /**

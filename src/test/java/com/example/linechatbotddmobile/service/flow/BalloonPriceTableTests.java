@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 /**
  * ล็อกตารางราคาผ่อนบอลลูนให้ตรงกับตารางของร้านแบบตัวต่อตัว
  *
- * ตัวเลขในคลาสนี้คัดมาจาก iphone_balloon_installments.csv ที่ร้านส่งมา (13 mini → 18 Duo, 26 รุ่น)
+ * ตัวเลขในคลาสนี้คัดมาจาก iphone_balloon_installments.csv ที่ร้านส่งมา (13 mini → iPhone Duo, 26 รุ่น)
  * ถ้าใครแก้ราคาในโค้ดผิดตัวเดียว เทสต์นี้จะจับได้ทันทีว่ารุ่นไหน งวดไหน
  *
  * รูปแบบ: { รับซื้อ, 6, 8, 10, 12, 15, 18, 21, 24 } — ใส่เท่าที่รุ่นนั้นมีในตาราง
@@ -63,7 +63,7 @@ class BalloonPriceTableTests {
         SHOP_PRICE_TABLE.put("18",         new int[]{18000, 5750, 4550, 3750, 3350, 2750, 2450, 2150, 1950});
         SHOP_PRICE_TABLE.put("18 Pro",     new int[]{25000, 7950, 6250, 5250, 4550, 3850, 3350, 2950, 2750});
         SHOP_PRICE_TABLE.put("18 Pro Max", new int[]{28000, 8850, 6950, 5850, 5150, 4250, 3750, 3350, 2950});
-        SHOP_PRICE_TABLE.put("18 Duo",     new int[]{35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750});
+        SHOP_PRICE_TABLE.put("Duo",        new int[]{35000, 11050, 8750, 7350, 6450, 5350, 4650, 4150, 3750});
     }
 
     private UserStateRepository userStateRepository;
@@ -162,9 +162,30 @@ class BalloonPriceTableTests {
         assertThat(quoteFor("16e")).contains("ยอดรับซื้อ: 7,000 บ.");            // 16e ต้องไม่ถูกแยกเป็น "16 e"
         assertThat(quoteFor("17E")).contains("ยอดรับซื้อ: 7,000 บ.");            // รุ่นใหม่ในตาราง
         assertThat(quoteFor("iPhone 18 Pro Max")).contains("ยอดรับซื้อ: 28,000 บ.");
-        assertThat(quoteFor("18duo")).contains("ยอดรับซื้อ: 35,000 บ.");         // พิมพ์ติดกัน ต้องเจอ 18 Duo
-        assertThat(quoteFor("18 DUO")).contains("ยอดรับซื้อ: 35,000 บ.");
+        assertThat(quoteFor("iPhone Duo")).contains("ยอดรับซื้อ: 35,000 บ.");
+        assertThat(quoteFor("DUO")).contains("ยอดรับซื้อ: 35,000 บ.");
         assertThat(quoteFor("18")).contains("ยอดรับซื้อ: 18,000 บ.");
+    }
+
+    @Test
+    void customerAlreadyStoredAsEighteenDuoStillGetsTheDuoQuote() {
+        // ลูกค้าที่คุยค้างอยู่ตอน deploy ถูกบันทึกรุ่นไว้แล้วว่า "18 Duo" — ต้องได้ราคาและชื่อที่ถูกต้อง
+        String quote = quoteFor("18 Duo");
+
+        assertThat(quote).isEqualTo(expectedQuote("Duo", SHOP_PRICE_TABLE.get("Duo")));
+        assertThat(quoteFor("18duo")).isEqualTo(quote);
+    }
+
+    @Test
+    void customerAlreadyStoredAsEighteenDuoCanStillPickATenor() {
+        UserState user = monthSelectionUser("18 Duo");
+
+        service.processMessage(user, "24");
+
+        assertThat(user.getCurrentState()).isEqualTo("ADMIN_MODE");
+        verify(lineMessageService).sendSuccessCard(
+                anyString(), anyString(), anyString(), anyString(), anyString(),
+                org.mockito.ArgumentMatchers.contains("24 เดือน (งวดละ 3,750 บ.)"));
     }
 
     @Test

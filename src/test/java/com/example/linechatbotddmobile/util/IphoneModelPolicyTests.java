@@ -43,9 +43,9 @@ class IphoneModelPolicyTests {
 
     @Test
     void rejectionMessageAdvertisesTheCurrentAcceptedRange() {
-        // ช่วงรุ่นในข้อความต้องตรงกับรุ่นสูงสุดในตารางราคา (18 Duo)
+        // ช่วงรุ่นในข้อความต้องตรงกับรุ่นในตารางราคา (13 → 18 Pro Max และ iPhone Duo)
         assertThat(IphoneModelPolicy.UNSUPPORTED_BELOW_IPHONE_13_MESSAGE)
-                .contains("เปิดรับ 13-18 Duo")
+                .isEqualTo("ขออภัยครับลูกค้า ทางร้านเปิดรับ 13 - 18 Pro Max และ iPhone Duo ครับ หากลูกค้ามีไอโฟน 13 ขึ้นติดต่อมาอีกครั้งนะครับผม")
                 .doesNotContain("17promax");
     }
 
@@ -62,7 +62,9 @@ class IphoneModelPolicyTests {
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("17 Pro Max")).isFalse();
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18")).isFalse();
         assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18 Pro Max")).isFalse();
-        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("18 Duo")).isFalse();
-        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Message("ไอโฟน 18 duo")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("Duo")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Model("iPhone Duo")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Message("iphone duo")).isFalse();
+        assertThat(IphoneModelPolicy.isUnsupportedBelowIphone13Message("ไอโฟนดูโอ")).isFalse();
     }
 }
